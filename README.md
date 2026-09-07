@@ -4,6 +4,9 @@ Etsy ve Shopify için yerel ürün, SEO ve mockup yönetimi. Bu depo temiz kurul
 kodunu içerir; başka kullanıcının mağaza bağlantılarını, anahtarlarını, veritabanını,
 fiyat profillerini veya mockup görsellerini içermez.
 
+**İlk kurulum veya eski sürümden geçiş için [INSTALL.md](INSTALL.md) rehberini okuyun.**
+Yeni kullanıcılar ve mevcut verilerini taşıyacak kullanıcılar için ayrı adımlar içerir.
+
 ## Windows kurulumu
 
 1. Node.js 24 veya daha yeni bir sürümü kurun.
@@ -22,6 +25,7 @@ fiyat profillerini veya mockup görsellerini içermez.
    geçilebilir; eksik satış bilgilerini ürün yayınlamadan önce tamamlayın.
 
 Kapatmak için `run_stop.vbs` kullanın. Başlatma sorunu varsa `logs/` klasörünü inceleyin.
+Başlatıcıların kullandığı `start_hidden.ps1` ve `stop_hidden.ps1` dosyalarını silmeyin.
 
 Terminalden çalıştırmak için iki ayrı terminalde, sırasıyla `backend` içinde
 `npm start`, `frontend` içinde `npm run dev` çalıştırabilirsiniz.
