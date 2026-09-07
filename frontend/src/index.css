@@ -1,0 +1,146 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #0b0f19; /* Ultra modern premium dark background */
+  color: #f1f5f9;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Outfit', sans-serif;
+}
+
+/* Custom Scrollbar for premium feel */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Micro-animations */
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Şablon Stüdyosu — otomatik şablon tarama efekti                     */
+/* ------------------------------------------------------------------ */
+
+.mockup-scan {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: 0.75rem;
+  background: rgba(8, 13, 24, 0.55);
+  backdrop-filter: blur(1.5px);
+}
+
+/* Yüzeyi tarayan ışık dalgası */
+.mockup-scan__sweep {
+  position: absolute;
+  top: -25%;
+  bottom: -25%;
+  left: -70%;
+  right: -70%;
+  background: linear-gradient(
+    103deg,
+    transparent 38%,
+    rgba(245, 158, 11, 0.06) 45%,
+    rgba(245, 158, 11, 0.38) 50%,
+    rgba(245, 158, 11, 0.06) 55%,
+    transparent 62%
+  );
+  animation: mockupScanSweep 1.5s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  will-change: transform;
+}
+
+@keyframes mockupScanSweep {
+  0%   { transform: translateX(-32%); }
+  100% { transform: translateX(32%); }
+}
+
+/* Tarama sırasında beliren ölçüm ızgarası */
+.mockup-scan__grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, rgba(245, 158, 11, 0.14) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(245, 158, 11, 0.14) 1px, transparent 1px);
+  background-size: 34px 34px;
+  animation: mockupScanGrid 2.4s ease-in-out infinite;
+}
+
+@keyframes mockupScanGrid {
+  0%, 100% { opacity: 0.25; }
+  50%      { opacity: 0.7; }
+}
+
+.mockup-scan__label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  animation: mockupScanPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes mockupScanPulse {
+  0%, 100% { opacity: 0.75; }
+  50%      { opacity: 1; }
+}
+
+/* Köşe noktaları yerleşince kısa bir vurgu */
+.mockup-scan-pop {
+  animation: mockupScanPop 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes mockupScanPop {
+  0%   { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.55); }
+  100% { box-shadow: 0 0 0 22px rgba(245, 158, 11, 0); }
+}

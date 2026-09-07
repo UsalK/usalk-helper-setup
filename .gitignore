@@ -1,0 +1,66 @@
+# Ortam Değişkenleri ve API Anahtarları (Environment & Secrets)
+.env
+.env.*
+!.env.example
+*.env
+kimik26_api.txt
+
+# Bağımlılıklar (Dependencies)
+node_modules/
+**/node_modules/
+
+# Derleme ve Çıktı Klasörleri (Build Outputs)
+dist/
+frontend/dist/
+build/
+
+# Yerel Veritabanı ve Token'lar (Database & Auth Tokens)
+backend/db/*.db
+backend/db/*.db-shm
+backend/db/*.db-wal
+backend/db/agent-seo/
+*.sqlite
+*.sqlite3
+
+# Depolama, Yüklemeler, Geçici ve Yedek Dosyalar (Storage, Uploads & Backups)
+storage/
+storage
+backend/uploads/
+backend/scratch/*.json
+backups/
+temp/
+tmp/
+
+# Finansal Ekstreler ve Raporlar (Statements & Reports)
+etsy_statement_*.csv
+
+# Sistem, IDE ve Editör Dosyaları (OS & IDE Files)
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+.claude/
+.obsidian/
+**/.obsidian/
+
+# Log Dosyaları (Logs)
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Çalışma Dosyaları (Workspace Files)
+plan.md
+start.bat
+
+# Personal state and legacy exports (never publish)
+backend/db/local-state/
+backend/config/templates_seed.json
+backend/config/profiles_seed.json
+backend/scratch/
+backend/scripts/policy-remediation-plan.json
+etsy-policy-audit-*.csv
+md/varyasyon-fiyat-referansi.md
+logs/
+usalkhelper/
