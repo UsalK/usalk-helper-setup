@@ -16,6 +16,7 @@ import mockupRouter from './routes/mockup.js';
 import shopifyRouter from './routes/shopify.js';
 import storageRouter from './routes/storage.js';
 import bulkJobsRouter from './routes/bulkjobs.js';
+import versionRouter from './routes/version.js';
 import setupRouter from './routes/setup.js';
 import { resumePendingJobs } from './services/BulkJobService.js';
 
@@ -67,6 +68,7 @@ app.use('/api/mockup', mockupRouter);
 app.use('/api/shopify', shopifyRouter);
 app.use('/api/storage', storageRouter);
 app.use('/api/bulk-jobs', bulkJobsRouter);
+app.use('/api/version', versionRouter);
 
 
 // Global Error Handler

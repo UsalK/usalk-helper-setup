@@ -64,3 +64,14 @@ etsy-policy-audit-*.csv
 md/varyasyon-fiyat-referansi.md
 logs/
 usalkhelper/
+
+# Etsy API kesif/hata ayiklama betikleri — diskte kalir, dagitimda yer almaz
+backend/check_*.js
+backend/find_*.js
+backend/get_*.js
+backend/inspect_*.js
+backend/print_*.js
+backend/read_doc.js
+backend/update_etsy_prices.js
+backend/scripts/policyRemediation.js
+etsy-api_doc.json

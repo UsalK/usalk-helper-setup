@@ -13,6 +13,7 @@ import {
   Wrench,
   CalendarClock
 } from 'lucide-react';
+import VersionBadge from './VersionBadge';
 
 export default function Sidebar({ 
   currentPage, 
@@ -71,17 +72,21 @@ export default function Sidebar({
   return (
     <aside className="w-64 bg-[#0e1726] border-r border-[#1e293b] flex flex-col h-screen sticky top-0">
       {/* Brand Header */}
-      <div className="p-6 border-b border-[#1e293b] flex items-center space-x-3">
-        <div className={`w-8 h-8 rounded-lg bg-gradient-to-tr ${accentColorClass} flex items-center justify-center font-bold text-white shadow-lg ${shadowGlowClass}`}>
+      <div className="p-6 border-b border-[#1e293b] flex items-end space-x-3">
+        <div className={`w-8 h-8 rounded-lg bg-gradient-to-tr ${accentColorClass} flex items-center justify-center font-bold text-white shadow-lg ${shadowGlowClass} shrink-0`}>
           {appMode === 'etsy' ? 'E' : 'S'}
         </div>
-        <div>
+        <div className="min-w-0">
           <h1 className="font-bold text-lg leading-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent font-outfit">
             Usalk Helper
           </h1>
           <span className="text-[9px] text-slate-500 font-semibold tracking-wider uppercase">
             {appMode === 'etsy' ? 'Etsy SEO & Mockup' : 'Shopify Theme & CMS'}
           </span>
+        </div>
+        {/* Sürüm rozeti — başlığın sağ altı */}
+        <div className="ml-auto shrink-0">
+          <VersionBadge />
         </div>
       </div>
 
