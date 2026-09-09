@@ -75,3 +75,6 @@ backend/read_doc.js
 backend/update_etsy_prices.js
 backend/scripts/policyRemediation.js
 etsy-api_doc.json
+
+# Guncelleme hazirlama alani (indirilen paket + yedekler)
+.update-staging/
