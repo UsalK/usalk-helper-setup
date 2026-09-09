@@ -14,6 +14,7 @@ import {
   CalendarClock
 } from 'lucide-react';
 import VersionBadge from './VersionBadge';
+import { SHOPIFY_ENABLED } from '../config/features';
 
 export default function Sidebar({ 
   currentPage, 
@@ -138,15 +139,18 @@ export default function Sidebar({
       </nav>
 
       {/* Bottom Switch Mode Control */}
-      <div className="p-4 border-t border-[#1e293b] space-y-3">
-        <button
-          onClick={handleSwitchMode}
-          className="w-full flex items-center justify-center space-x-2 text-xs font-semibold py-2.5 px-3 rounded-xl bg-slate-800/50 hover:bg-slate-850 hover:text-white border border-[#1e293b] text-slate-400 transition-colors cursor-pointer"
-        >
-          <Shuffle className="w-3.5 h-3.5" />
-          <span>Platform Değiştir</span>
-        </button>
-      </div>
+      {/* Gecilecek ikinci bir platform yoksa dugme gosterilmez */}
+      {SHOPIFY_ENABLED && (
+        <div className="p-4 border-t border-[#1e293b] space-y-3">
+          <button
+            onClick={handleSwitchMode}
+            className="w-full flex items-center justify-center space-x-2 text-xs font-semibold py-2.5 px-3 rounded-xl bg-slate-800/50 hover:bg-slate-850 hover:text-white border border-[#1e293b] text-slate-400 transition-colors cursor-pointer"
+          >
+            <Shuffle className="w-3.5 h-3.5" />
+            <span>Platform Değiştir</span>
+          </button>
+        </div>
+      )}
     </aside>
   );
 }

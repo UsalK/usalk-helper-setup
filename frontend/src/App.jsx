@@ -18,6 +18,7 @@ import ThemeStudio from './pages/ThemeStudio';
 import ShopifyBulkUpload from './pages/ShopifyBulkUpload';
 import StorageCleanup from './pages/StorageCleanup';
 import BulkJobWidget from './components/BulkJobWidget';
+import { SHOPIFY_ENABLED } from './config/features';
 
 const API_BASE = 'http://localhost:3001/api';
 
@@ -50,7 +51,12 @@ function parseHash() {
 
 export default function App() {
   const initialRoute = parseHash();
-  const [appMode, setAppMode] = useState(initialRoute.mode);
+  // Shopify kapaliyken secilecek tek bir platform kaliyor; kullaniciyi tek
+  // secenekli bir secim ekraninda bekletmeden dogrudan Etsy moduna geciyoruz.
+  // Adres cubugundan #/shopify/... yazilirsa o mod yine acilir.
+  const [appMode, setAppMode] = useState(
+    initialRoute.mode || (SHOPIFY_ENABLED ? null : 'etsy')
+  );
   const [currentPage, setCurrentPage] = useState(initialRoute.page);
   const [etsyConnected, setEtsyConnected] = useState(false);
   const [activeShop, setActiveShop] = useState(null);
@@ -113,7 +119,10 @@ export default function App() {
   useEffect(() => {
     const onHashChange = () => {
       const { mode, page } = parseHash();
-      setAppMode(prev => (prev === mode ? prev : mode));
+      // '#/' gibi modsuz bir adreste, seçim ekranı kapalıysa boş ekranda
+      // kalmamak için Etsy moduna dönülür.
+      const nextMode = mode || (SHOPIFY_ENABLED ? null : 'etsy');
+      setAppMode(prev => (prev === nextMode ? prev : nextMode));
       setCurrentPage(prev => (prev === page ? prev : page));
     };
     window.addEventListener('hashchange', onHashChange);
@@ -228,7 +237,8 @@ export default function App() {
   }
 
   // 1. Landing Mode Selection Page
-  if (!appMode) {
+  // Yalnizca birden fazla platform aciksa gosterilir.
+  if (!appMode && SHOPIFY_ENABLED) {
     return (
       <div className="relative min-h-screen bg-[#0b0f19] flex items-center justify-center p-6 text-slate-100 overflow-hidden select-none">
         {/* Background glows */}

@@ -179,6 +179,14 @@ if (needsMigration) {
   db.exec(schema);
 }
 
+// Fiyat matrisinde cerceveleri tek sutunda toplama tercihi (varyasyon profili basina)
+try {
+  db.exec("ALTER TABLE variation_profiles ADD COLUMN price_grouping TEXT DEFAULT 'none'");
+  console.log("[Schema Upgrade] Added price_grouping column to variation_profiles table.");
+} catch (err) {
+  // Column already exists, ignore
+}
+
 // Ensure digital_file_path column exists in products table for digital downloads support
 try {
   db.exec("ALTER TABLE products ADD COLUMN digital_file_path TEXT");

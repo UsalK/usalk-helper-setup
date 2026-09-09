@@ -13,8 +13,15 @@ const parseProfile = (p) => ({
   template_ids: p.template_ids ? JSON.parse(p.template_ids) : [],
   kind: p.kind || 'single',
   panel_count: p.panel_count || 1,
-  panel_ratio: p.panel_ratio || p.ratio
+  panel_ratio: p.panel_ratio || p.ratio,
+  price_grouping: p.price_grouping || 'none'
 });
+
+/** Fiyat matrisi gruplama tercihi; gecersiz deger gelirse gruplama kapali sayilir. */
+const resolvePriceGrouping = (body, existing) => {
+  const value = body.price_grouping ?? existing?.price_grouping ?? 'none';
+  return value === 'frames' ? 'frames' : 'none';
+};
 
 /** Panel alanları gövdede yoksa mevcut satırdan korunur. */
 const resolvePanelFields = (body, existing) => {
@@ -45,11 +52,12 @@ router.post('/', (req, res, next) => {
     const existing = db.prepare('SELECT * FROM variation_profiles WHERE id = ? AND shop_id = ?')
       .get(id, activeShop.shop_id);
     const { kind, panelCount, panelRatio } = resolvePanelFields(req.body, existing);
+    const priceGrouping = resolvePriceGrouping(req.body, existing);
 
     const stmt = db.prepare(`
       INSERT INTO variation_profiles
-        (id, shop_id, name, ratio, sizes, frames, combinations, template_ids, kind, panel_count, panel_ratio)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (id, shop_id, name, ratio, sizes, frames, combinations, template_ids, kind, panel_count, panel_ratio, price_grouping)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(shop_id, id) DO UPDATE SET
         name = EXCLUDED.name,
         ratio = EXCLUDED.ratio,
@@ -59,7 +67,8 @@ router.post('/', (req, res, next) => {
         template_ids = EXCLUDED.template_ids,
         kind = EXCLUDED.kind,
         panel_count = EXCLUDED.panel_count,
-        panel_ratio = EXCLUDED.panel_ratio
+        panel_ratio = EXCLUDED.panel_ratio,
+        price_grouping = EXCLUDED.price_grouping
     `);
     stmt.run(
       id,
@@ -72,12 +81,13 @@ router.post('/', (req, res, next) => {
       JSON.stringify(template_ids || []),
       kind,
       panelCount,
-      panelRatio
+      panelRatio,
+      priceGrouping
     );
     exportTemplatesToSeed();
     res.json({
       id, shop_id: activeShop.shop_id, name, ratio, sizes, frames, combinations, template_ids,
-      kind, panel_count: panelCount, panel_ratio: panelRatio
+      kind, panel_count: panelCount, panel_ratio: panelRatio, price_grouping: priceGrouping
     });
   } catch (err) {
     next(err);
@@ -93,11 +103,12 @@ router.put('/:id', (req, res, next) => {
     const existing = db.prepare('SELECT * FROM variation_profiles WHERE id = ? AND shop_id = ?')
       .get(id, activeShop.shop_id);
     const { kind, panelCount, panelRatio } = resolvePanelFields(req.body, existing);
+    const priceGrouping = resolvePriceGrouping(req.body, existing);
 
     const stmt = db.prepare(`
       UPDATE variation_profiles
       SET name = ?, ratio = ?, sizes = ?, frames = ?, combinations = ?, template_ids = ?,
-          kind = ?, panel_count = ?, panel_ratio = ?
+          kind = ?, panel_count = ?, panel_ratio = ?, price_grouping = ?
       WHERE id = ? AND shop_id = ?
     `);
     stmt.run(
@@ -110,13 +121,14 @@ router.put('/:id', (req, res, next) => {
       kind,
       panelCount,
       panelRatio,
+      priceGrouping,
       id,
       activeShop.shop_id
     );
     exportTemplatesToSeed();
     res.json({
       id, shop_id: activeShop.shop_id, name, ratio, sizes, frames, combinations, template_ids,
-      kind, panel_count: panelCount, panel_ratio: panelRatio
+      kind, panel_count: panelCount, panel_ratio: panelRatio, price_grouping: priceGrouping
     });
   } catch (err) {
     next(err);

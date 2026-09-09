@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS variation_profiles (
   frames TEXT,           -- JSON string array: ["Roll", "Black Frame", ...]
   combinations TEXT,     -- JSON string array: [{size, frame, price}]
   template_ids TEXT,     -- JSON string array of template IDs
+  price_grouping TEXT DEFAULT 'none',  -- 'none' | 'frames' (fiyat matrisinde cerceveleri tek sutunda topla)
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (shop_id, id)
 );

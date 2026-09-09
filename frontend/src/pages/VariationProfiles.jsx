@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
   ArrowLeft, Plus, Trash2, Save, Grid, CheckCircle, 
-  HelpCircle, Sparkles, AlertTriangle, Layers, RefreshCw
+  HelpCircle, Sparkles, AlertTriangle, Layers, RefreshCw, X
 } from 'lucide-react';
 import RECOMMENDED_DATA from './recommended_data.json';
 import { filterActiveProfiles, isSetProfile } from '../utils/profileFlags';
+import { buildPriceColumns, columnPriceOf, setColumnPrice } from '../utils/frameGroups';
 
 const API_BASE = 'http://localhost:3001/api';
 
@@ -42,7 +43,6 @@ const recommendedKey = (profile) =>
 
 export default function VariationProfiles() {
   const [profiles, setProfiles] = useState([]);
-  const [templates, setTemplates] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState(null);
   
   const [loading, setLoading] = useState(false);
@@ -58,6 +58,9 @@ export default function VariationProfiles() {
   const [frames, setFrames] = useState([]);
   const [newFrame, setNewFrame] = useState('');
 
+  // "Uyumlu Mockup Odaları" arayüzü kaldırıldı. Değer yine de okunup geri
+  // yazılır: eskiden elle eşlenmiş şablonlar kaydetmede sessizce düşmesin.
+  // Şablon eşleşmesi artık Şablon Stüdyosu'ndaki "Uyumlu Oranlar" ile yapılır.
   const [selectedTemplateIds, setSelectedTemplateIds] = useState([]);
   
   // Matrix prices: { "size_frame": price }
@@ -67,29 +70,38 @@ export default function VariationProfiles() {
   const [bulkBasePrice, setBulkBasePrice] = useState('35');
   const [bulkFrameAddon, setBulkFrameAddon] = useState('50');
 
+  // Fiyat matrisinde çerçeveleri tek sütunda toplama tercihi (profil başına)
+  const [priceGrouping, setPriceGrouping] = useState('none');
+
+  // Yeni varyasyon oluşturma
+  const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [draft, setDraft] = useState({ name: '', w: '', h: '', kind: 'single', panelCount: 2 });
+
+  // Listede hem koddaki varsayılan profiller hem de kullanıcının kendi
+  // oluşturdukları görünür. Varsayılanlar veritabanında varsa oradaki
+  // (sayaçları dolu) kayıt kullanılır.
+  const allProfiles = [
+    ...DEFAULT_PROFILES.map(def => profiles.find(p => p.id === def.id) || def),
+    ...profiles.filter(p => !DEFAULT_PROFILES.some(d => d.id === p.id))
+  ];
+
   useEffect(() => {
     fetchProfiles();
-    fetchTemplates();
   }, []);
 
   const fetchProfiles = async () => {
     setLoading(true);
     try {
       const res = await axios.get(`${API_BASE}/variations`);
-      setProfiles(filterActiveProfiles(res.data));
+      const active = filterActiveProfiles(res.data);
+      setProfiles(active);
+      return active;
     } catch (err) {
       console.error('Profiller yüklenemedi:', err);
+      return [];
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchTemplates = async () => {
-    try {
-      const res = await axios.get(`${API_BASE}/templates`);
-      setTemplates(res.data);
-    } catch (err) {
-      console.error(err);
     }
   };
 
@@ -107,6 +119,7 @@ export default function VariationProfiles() {
       });
     }
     setPriceMap(map);
+    setPriceGrouping(profile.price_grouping === 'frames' ? 'frames' : 'none');
     setEditorTab('settings');
     setUploadFiles([]);
     setIsUploading(false);
@@ -208,21 +221,6 @@ export default function VariationProfiles() {
     setPriceMap(updatedMap);
   };
 
-  // Mockup association
-  const handleTemplateToggle = (tplId) => {
-    setSelectedTemplateIds(prev => 
-      prev.includes(tplId) ? prev.filter(id => id !== tplId) : [...prev, tplId]
-    );
-  };
-
-  // Handle cell price changes
-  const handlePriceChange = (size, frame, value) => {
-    setPriceMap(prev => ({
-      ...prev,
-      [`${size}_${frame}`]: Number(value) || 0
-    }));
-  };
-
   // Bulk price fill matrix tool
   const applyBulkPricing = () => {
     const base = Number(bulkBasePrice) || 0;
@@ -262,7 +260,10 @@ export default function VariationProfiles() {
       sizes,
       frames,
       combinations,
-      template_ids: selectedTemplateIds
+      // "Uyumlu Mockup Odaları" arayüzü kaldırıldı; mevcut değer olduğu gibi
+      // korunur ki eskiden elle eklenen şablonlar sessizce düşmesin.
+      template_ids: selectedTemplateIds,
+      price_grouping: priceGrouping
     };
 
     setLoading(true);
@@ -276,6 +277,110 @@ export default function VariationProfiles() {
     } finally {
       setLoading(false);
     }
+  };
+
+  /* ------------------------------------------------------------------ */
+  /* Kendi varyasyonunu oluşturma                                        */
+  /* ------------------------------------------------------------------ */
+
+  /** Varsayılan (kod içinde tanımlı) profiller silinemez. */
+  const isBuiltIn = (id) => DEFAULT_PROFILES.some(d => d.id === id);
+
+  const handleCreateProfile = async (e) => {
+    e.preventDefault();
+
+    const name = draft.name.trim();
+    const w = Number(draft.w);
+    const h = Number(draft.h);
+    const isSet = draft.kind === 'set';
+    const panelCount = Math.max(2, Number(draft.panelCount) || 2);
+
+    if (!name) return alert('Varyasyon için bir ad girin.');
+    if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) {
+      return alert('Oran için iki pozitif sayı girin (örn. 4 ve 5).');
+    }
+
+    const panelRatio = `${w}:${h}`;
+    const ratio = isSet ? `${panelRatio}x${panelCount}` : panelRatio;
+
+    // Aynı oran anahtarına sahip iki profil olursa görselden otomatik profil
+    // seçimi hangisini kullanacağını bilemez.
+    if (allProfiles.some(p => p.ratio === ratio)) {
+      return alert(`"${ratio}" oranında bir varyasyon zaten var. Önce onu düzenleyin ya da farklı bir oran girin.`);
+    }
+
+    const id = `custom_${w}_${h}${isSet ? `x${panelCount}` : ''}_${Date.now().toString(36)}`;
+
+    setCreating(true);
+    try {
+      await axios.post(`${API_BASE}/variations`, {
+        id,
+        name,
+        ratio,
+        sizes: [],
+        frames: [],
+        combinations: [],
+        template_ids: [],
+        kind: isSet ? 'set' : 'single',
+        panel_count: isSet ? panelCount : 1,
+        panel_ratio: panelRatio,
+        price_grouping: 'none'
+      });
+
+      setShowCreate(false);
+      setDraft({ name: '', w: '', h: '', kind: 'single', panelCount: 2 });
+      const list = await fetchProfiles();
+      const created = (list || []).find(p => p.id === id);
+      if (created) handleEditRatio(created);
+    } catch (err) {
+      console.error(err);
+      alert('Varyasyon oluşturulamadı: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDeleteProfile = async (profile) => {
+    if (!confirm(`"${profile.name}" varyasyonu silinecek. Bu profile bağlı ürünler oran eşleşmesini kaybeder. Devam edilsin mi?`)) return;
+    try {
+      await axios.delete(`${API_BASE}/variations/${profile.id}`);
+      fetchProfiles();
+    } catch (err) {
+      console.error(err);
+      alert('Silinemedi: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
+  /* ------------------------------------------------------------------ */
+  /* Gruplu fiyat matrisi                                                */
+  /* ------------------------------------------------------------------ */
+
+  const isGrouped = priceGrouping === 'frames';
+  const priceColumns = buildPriceColumns(frames, isGrouped);
+  const groupedColumn = priceColumns.find(c => c.grouped);
+
+  const handleColumnPriceChange = (size, column, value) => {
+    setPriceMap(prev => setColumnPrice(prev, size, column, value));
+  };
+
+  /**
+   * Gruplama açılırken, çerçeve fiyatları birbirinden farklıysa ilk çerçevenin
+   * fiyatı hepsine yayılır; böylece sütun tek bir değer gösterebilir.
+   */
+  const enableGrouping = () => {
+    const columns = buildPriceColumns(frames, true);
+    setPriceMap(prev => {
+      let next = prev;
+      sizes.forEach(size => {
+        columns.filter(c => c.grouped).forEach(column => {
+          if (columnPriceOf(next, size, column) === null) {
+            next = setColumnPrice(next, size, column, next[`${size}_${column.frames[0]}`] || 0);
+          }
+        });
+      });
+      return next;
+    });
+    setPriceGrouping('frames');
   };
 
   const handleCustomDraftUpload = async () => {
@@ -313,18 +418,28 @@ export default function VariationProfiles() {
     <div className="max-w-6xl mx-auto py-8 px-4 animate-fade-in">
       {view === 'list' ? (
         <>
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-white tracking-tight">Oran Bazlı Varyasyon Ayarları</h2>
-            <p className="text-slate-400 text-sm mt-0.5">Her oran için ayrı sayfalarda boyut, çerçeve, mockup uyumluluğu ve fiyat şablonlarını yönetin.</p>
+          <div className="mb-8 flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-bold text-white tracking-tight">Oran Bazlı Varyasyon Ayarları</h2>
+              <p className="text-slate-400 text-sm mt-0.5">Her oran için ayrı sayfalarda boyut, çerçeve ve fiyat şablonlarını yönetin.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowCreate(true)}
+              className="flex items-center space-x-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 px-5 rounded-xl shadow-lg shadow-amber-500/10 transition-colors shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Yeni Varyasyon</span>
+            </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {DEFAULT_PROFILES.map(defProf => {
-              // Find seeded profile for this profile ID
+            {allProfiles.map(defProf => {
               const profile = profiles.find(p => p.id === defProf.id);
               const totalSizes = profile?.sizes?.length || 0;
               const totalFrames = profile?.frames?.length || 0;
-              const totalMockups = profile?.template_ids?.length || 0;
+              const totalCombos = profile?.combinations?.length || 0;
+              const custom = !isBuiltIn(defProf.id);
 
               return (
                 <div 
@@ -341,9 +456,21 @@ export default function VariationProfiles() {
                           </span>
                         )}
                       </div>
-                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                        {isSetProfile(defProf) ? 'Özel Set' : 'Oran Sayfası'}
-                      </span>
+                      <div className="flex items-center space-x-2">
+                        <span className={`text-[10px] font-bold uppercase tracking-wider ${custom ? 'text-amber-500' : 'text-slate-500'}`}>
+                          {custom ? 'Kendi Varyasyonun' : (isSetProfile(defProf) ? 'Özel Set' : 'Oran Sayfası')}
+                        </span>
+                        {custom && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteProfile(defProf)}
+                            title="Bu varyasyonu sil"
+                            className="text-slate-600 hover:text-rose-400 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <h3 className="text-lg font-bold text-white group-hover:text-amber-500 transition-colors mb-4">
@@ -360,14 +487,14 @@ export default function VariationProfiles() {
                         <strong className="text-slate-200">{totalFrames} adet</strong>
                       </div>
                       <div className="flex justify-between">
-                        <span>Uyumlu Şablon:</span>
-                        <strong className="text-slate-200">{totalMockups} adet</strong>
+                        <span>Fiyat Girilmiş:</span>
+                        <strong className="text-slate-200">{totalCombos} kombinasyon</strong>
                       </div>
                     </div>
                   </div>
 
                   <button
-                    onClick={() => profile && handleEditRatio(profile)}
+                    onClick={() => handleEditRatio(profile || defProf)}
                     className="w-full text-center text-xs font-semibold py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl mt-6 border border-[#334155] transition-colors"
                   >
                     Varyasyon Ayarlarını Düzenle
@@ -376,6 +503,135 @@ export default function VariationProfiles() {
               );
             })}
           </div>
+
+          {/* Yeni varyasyon oluşturma */}
+          {showCreate && (
+            <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <form
+                onSubmit={handleCreateProfile}
+                className="bg-[#0e1726] border border-[#1e293b] rounded-3xl w-full max-w-md p-6 space-y-5 shadow-2xl"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Yeni Varyasyon</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Kendi oranınızı tanımlayın. Boyut, çerçeve ve fiyatları sonraki adımda girersiniz.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreate(false)}
+                    className="p-1.5 text-slate-500 hover:text-white rounded-lg"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ad</label>
+                  <input
+                    type="text"
+                    value={draft.name}
+                    onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                    placeholder="Örn: 4:5 Oranı (Dikey)"
+                    className="w-full bg-[#151f32] border border-[#1e293b] rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Oran</label>
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="number" min="1" step="1"
+                      value={draft.w}
+                      onChange={(e) => setDraft({ ...draft, w: e.target.value })}
+                      placeholder="4"
+                      className="w-24 bg-[#151f32] border border-[#1e293b] rounded-xl px-4 py-3 text-sm text-slate-200 text-center focus:outline-none focus:border-amber-500"
+                    />
+                    <span className="text-slate-500 font-bold">:</span>
+                    <input
+                      type="number" min="1" step="1"
+                      value={draft.h}
+                      onChange={(e) => setDraft({ ...draft, h: e.target.value })}
+                      placeholder="5"
+                      className="w-24 bg-[#151f32] border border-[#1e293b] rounded-xl px-4 py-3 text-sm text-slate-200 text-center focus:outline-none focus:border-amber-500"
+                    />
+                    <span className="text-[11px] text-slate-500">
+                      genişlik : yükseklik
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tip</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { key: 'single', label: 'Tek Panel' },
+                      { key: 'set', label: 'Çok Panelli Set' }
+                    ].map(opt => (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => setDraft({ ...draft, kind: opt.key })}
+                        className={`py-2.5 px-4 border rounded-xl font-semibold text-xs transition-all ${
+                          draft.kind === opt.key
+                            ? 'bg-amber-500/10 border-amber-500/30 text-amber-500'
+                            : 'bg-[#151f32] border-[#1e293b] text-slate-400'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {draft.kind === 'set' && (
+                  <div className="space-y-2">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Panel Sayısı</label>
+                    <input
+                      type="number" min="2" max="6" step="1"
+                      value={draft.panelCount}
+                      onChange={(e) => setDraft({ ...draft, panelCount: e.target.value })}
+                      className="w-24 bg-[#151f32] border border-[#1e293b] rounded-xl px-4 py-3 text-sm text-slate-200 text-center focus:outline-none focus:border-amber-500"
+                    />
+                    <p className="text-[10px] text-slate-500">
+                      Girdiğiniz oran <strong className="text-slate-400">panel başına</strong> geçerlidir.
+                    </p>
+                  </div>
+                )}
+
+                <div className="p-3 bg-[#151f32] border border-[#1e293b] rounded-xl">
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Oluşacak oran anahtarı</span>
+                  <p className="text-sm font-bold text-amber-500 mt-0.5 tabular-nums">
+                    {draft.w && draft.h
+                      ? `${draft.w}:${draft.h}${draft.kind === 'set' ? `x${draft.panelCount}` : ''}`
+                      : '—'}
+                  </p>
+                  <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
+                    Bu anahtar Şablon Stüdyosu'ndaki "Uyumlu Oranlar" listesinde ve
+                    görselden otomatik profil eşleşmesinde kullanılır.
+                  </p>
+                </div>
+
+                <div className="flex space-x-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreate(false)}
+                    className="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-semibold border border-[#334155]"
+                  >
+                    Vazgeç
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={creating}
+                    className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 text-sm font-bold"
+                  >
+                    {creating ? 'Oluşturuluyor…' : 'Oluştur ve Düzenle'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
         </>
       ) : (
         // Ratio Sub-page Editor view
@@ -628,42 +884,6 @@ export default function VariationProfiles() {
                   </div>
                 </div>
 
-                {/* Mockup template associations */}
-                <div className="bg-[#0e1726] border border-[#1e293b] rounded-2xl p-6 space-y-4">
-                  <h3 className="text-sm font-semibold text-white flex items-center space-x-2">
-                    <Layers className="w-4 h-4 text-amber-500" />
-                    <span>Uyumlu Mockup Odaları</span>
-                  </h3>
-                  
-                  <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
-                    {templates.map(tpl => {
-                      const isSelected = selectedTemplateIds.includes(tpl.id);
-                      return (
-                        <label 
-                          key={tpl.id}
-                          className={`flex items-center justify-between px-3.5 py-2 border rounded-xl cursor-pointer select-none text-xs transition-colors ${
-                            isSelected 
-                              ? 'bg-amber-500/10 border-amber-500/30 text-amber-500 font-medium' 
-                              : 'bg-[#151f32] border-[#1e293b] text-slate-400 hover:text-slate-200'
-                          }`}
-                        >
-                          <span>{tpl.name} ({tpl.type})</span>
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => handleTemplateToggle(tpl.id)}
-                            className="w-4 h-4 accent-amber-500 rounded focus:ring-0 cursor-pointer"
-                          />
-                        </label>
-                      );
-                    })}
-                    {templates.length === 0 && (
-                      <div className="text-center py-4 text-slate-600 text-xs italic">
-                        Sistemde henüz şablon eklenmemiş.
-                      </div>
-                    )}
-                  </div>
-                </div>
               </div>
 
               {/* Right side: Dynamic Price Matrix grid */}
@@ -673,7 +893,23 @@ export default function VariationProfiles() {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#1e293b]">
                       <div>
                         <h3 className="text-md font-semibold text-white">Oran Fiyat Matrisi</h3>
-                        <p className="text-xs text-slate-500 mt-0.5">Boyut ve çerçeve kesişim fiyatlarını girin.</p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {isGrouped
+                            ? 'Çerçeveli seçenekler tek sütunda; Roll ve Stretched Wood kendi fiyatlarında kalır.'
+                            : 'Boyut ve çerçeve kesişim fiyatlarını girin.'}
+                        </p>
+                        <label className="flex items-center space-x-2 mt-2 cursor-pointer w-fit">
+                          <input
+                            type="checkbox"
+                            checked={isGrouped}
+                            onChange={(e) => (e.target.checked ? enableGrouping() : setPriceGrouping('none'))}
+                            className="w-3.5 h-3.5 accent-amber-500 rounded cursor-pointer"
+                          />
+                          <span className="text-[11px] text-slate-300 font-semibold">Çerçeveleri grupla</span>
+                          <span className="text-[10px] text-slate-500">
+                            ({frames.length} → {buildPriceColumns(frames, true).length} sütun)
+                          </span>
+                        </label>
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2">
@@ -724,8 +960,15 @@ export default function VariationProfiles() {
                         <thead>
                           <tr className="border-b border-[#1e293b] text-slate-500 text-[10px] font-bold uppercase tracking-wider">
                             <th className="py-3 px-4">Boyut / Çerçeve</th>
-                            {frames.map(f => (
-                              <th key={f} className="py-3 px-4">{f}</th>
+                            {priceColumns.map(col => (
+                              <th key={col.key} className="py-3 px-4">
+                                {col.label}
+                                {col.grouped && (
+                                  <span className="block text-[9px] text-amber-500/70 font-medium normal-case tracking-normal">
+                                    {col.frames.length} çerçeve birlikte
+                                  </span>
+                                )}
+                              </th>
                             ))}
                           </tr>
                         </thead>
@@ -733,21 +976,27 @@ export default function VariationProfiles() {
                           {sizes.map(s => (
                             <tr key={s} className="text-xs hover:bg-[#151f32]/10">
                               <td className="py-3 px-4 text-slate-200 font-bold uppercase">{s}</td>
-                              {frames.map(f => (
-                                <td key={f} className="py-2 px-4">
-                                  <div className="relative flex items-center w-28">
-                                    <span className="absolute left-2.5 text-slate-500">$</span>
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      value={priceMap[`${s}_${f}`] || ''}
-                                      onChange={(e) => handlePriceChange(s, f, e.target.value)}
-                                      placeholder="0"
-                                      className="w-full bg-[#151f32] border border-[#1e293b] rounded-lg pl-6 pr-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
-                                    />
-                                  </div>
-                                </td>
-                              ))}
+                              {priceColumns.map(col => {
+                                const common = columnPriceOf(priceMap, s, col);
+                                return (
+                                  <td key={col.key} className="py-2 px-4">
+                                    <div className="relative flex items-center w-28">
+                                      <span className="absolute left-2.5 text-slate-500">$</span>
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        value={common === null ? '' : (common || '')}
+                                        onChange={(e) => handleColumnPriceChange(s, col, e.target.value)}
+                                        placeholder={common === null ? 'farklı' : '0'}
+                                        title={col.grouped ? col.frames.join(', ') : col.label}
+                                        className={`w-full bg-[#151f32] border rounded-lg pl-6 pr-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500 ${
+                                          common === null ? 'border-amber-500/40' : 'border-[#1e293b]'
+                                        }`}
+                                      />
+                                    </div>
+                                  </td>
+                                );
+                              })}
                             </tr>
                           ))}
                         </tbody>
