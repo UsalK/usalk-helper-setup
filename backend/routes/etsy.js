@@ -17,6 +17,7 @@ import {
   ROOM_MAPPING,
   MATERIALS_MAPPING
 } from '../config/etsyTaxonomy.js';
+import { SERVER_ORIGIN } from '../config/origin.js';
 
 
 const router = express.Router();
@@ -49,7 +50,9 @@ router.get('/auth-url', (req, res, next) => {
     stmt.run('etsy_code_verifier', verifierStr, verifierStr);
     
     const redirectUri = process.env.ETSY_REDIRECT_URI || 'http://localhost:3001/api/etsy/callback';
-    const scope = 'listings_r listings_w listings_d shops_r shops_w';
+    // transactions_r: siparişleri okumak için (sipariş → kaynak görsel → upscale).
+    // ETSY_SCOPES ile daraltılabilir; ör. geliştirme kopyası yalnızca okuma izni ister.
+    const scope = process.env.ETSY_SCOPES || 'listings_r listings_w listings_d shops_r shops_w transactions_r';
     const state = 'usalk_auth';
     
     const authUrl = `https://www.etsy.com/oauth/connect?` + new URLSearchParams({
@@ -592,7 +595,7 @@ router.get('/listings/:listingId/details', async (req, res, next) => {
         const subPathUrl = getProductStorageFolder(product.id).replace(/\\/g, '/');
         mockups = files.map(file => ({
           filename: file,
-          url: `http://localhost:3001/storage/${subPathUrl}/mockups/${product.id}/${file}`
+          url: `${SERVER_ORIGIN}/storage/${subPathUrl}/mockups/${product.id}/${file}`
         }));
       }
     }

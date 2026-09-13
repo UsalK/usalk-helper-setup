@@ -6,7 +6,7 @@ import {
   ChevronLeft, ChevronRight, CheckSquare, Square, Layers, Save, Tag, Grid
 } from 'lucide-react';
 
-const API_BASE = 'http://localhost:3001/api';
+import { API_BASE, API_ORIGIN } from '../config';
 
 export default function Dashboard({ etsyConnected, appMode }) {
   const [activeTab, setActiveTab] = useState('local'); // local, active, draft, inactive, sold_out, expired
@@ -796,7 +796,7 @@ export default function Dashboard({ etsyConnected, appMode }) {
                       <div>
                         <div className="aspect-[4/3] w-full bg-slate-950 rounded-2xl overflow-hidden mb-3 relative">
                           <img 
-                            src={`http://localhost:3001/${product.image_path}`} 
+                            src={`${API_ORIGIN}/${product.image_path}`} 
                             alt={product.title || 'Yerel Taslak'} 
                             className="w-full h-full object-cover"
                           />

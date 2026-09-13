@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { HardDrive, Trash2, RefreshCw, ShieldCheck, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
-const API_BASE = 'http://localhost:3001/api';
+import { API_BASE } from '../config';
 
 const CATEGORY_META = {
   live: {

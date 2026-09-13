@@ -5,7 +5,7 @@ import {
   Settings, FolderKanban, Truck, Tag, FileText, Info, Check, Clock
 } from 'lucide-react';
 
-const API_BASE = 'http://localhost:3001/api';
+import { API_BASE } from '../config';
 
 const ROOM_OPTIONS = [
   'Bathroom', 'Bedroom', 'Dorm', 'Entryway', 'Game room',

@@ -10,7 +10,7 @@ import {
   DEFAULT_PLACEMENT, DEFAULT_CORNERS
 } from '../utils/panels';
 
-const API_BASE = 'http://localhost:3001/api';
+import { API_BASE, API_ORIGIN } from '../config';
 
 const getAspectOfFile = (file) => {
   return new Promise((resolve) => {
@@ -422,10 +422,10 @@ export default function ShopifyBulkUpload() {
     }
 
     if (mockupTpls.length > 0) {
-      const productImg = await loadImage(`http://localhost:3001/${p.image_path}`);
+      const productImg = await loadImage(`${API_ORIGIN}/${p.image_path}`);
       
       for (const tpl of mockupTpls) {
-        const bgImg = await loadImage(`http://localhost:3001/${tpl.background_path}`);
+        const bgImg = await loadImage(`${API_ORIGIN}/${tpl.background_path}`);
         const ratios = (tpl.config.compatible_ratios && tpl.config.compatible_ratios.length > 0)
           ? tpl.config.compatible_ratios
           : ['2:3'];
@@ -518,7 +518,7 @@ export default function ShopifyBulkUpload() {
     // Process static templates
     for (const tpl of staticTpls) {
       try {
-        const staticImg = await loadImage(`http://localhost:3001/${tpl.background_path}`);
+        const staticImg = await loadImage(`${API_ORIGIN}/${tpl.background_path}`);
         const ratios = (tpl.config.compatible_ratios && tpl.config.compatible_ratios.length > 0)
           ? tpl.config.compatible_ratios
           : ['2:3'];
@@ -655,7 +655,7 @@ export default function ShopifyBulkUpload() {
                   {/* Thumbnail */}
                   <div className="relative w-full md:w-48 h-48 bg-[#0b0f19] rounded-xl overflow-hidden flex items-center justify-center border border-slate-800/80">
                     <img 
-                      src={`http://localhost:3001/${product.image_path}`} 
+                      src={`${API_ORIGIN}/${product.image_path}`} 
                       alt="Thumbnail" 
                       className="max-w-full max-h-full object-contain"
                     />

@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import Modal from './Modal';
 
-const API_BASE = 'http://localhost:3001/api';
+import { API_BASE } from '../config';
 
 /**
  * Toplu yükleme / güncelleme başlatıcı.

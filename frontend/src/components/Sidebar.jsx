@@ -11,7 +11,8 @@ import {
   BarChart3,
   HardDrive,
   Wrench,
-  CalendarClock
+  CalendarClock,
+  ShoppingBag
 } from 'lucide-react';
 import VersionBadge from './VersionBadge';
 import { SHOPIFY_ENABLED } from '../config/features';
@@ -30,6 +31,7 @@ export default function Sidebar({
   // Dynamic menu based on platform mode
   const menuItems = appMode === 'etsy' ? [
     { id: 'dashboard', name: 'Ürün Paneli', icon: LayoutDashboard },
+    { id: 'orders', name: 'Siparişler', icon: ShoppingBag },
     { id: 'renew-manager', name: 'Yenileme Yöneticisi', icon: CalendarClock },
     { id: 'analytics', name: 'Analiz & Optimizasyon', icon: BarChart3 },
     { id: 'price-update', name: 'Listing Fiyat Güncelle', icon: Coins },

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import axios from 'axios';
 
-const API_BASE = 'http://localhost:3001/api';
+import { API_BASE } from '../config';
 
 /** Vite derleme sırasında kökteki package.json sürümünü gömer. */
 const BUILD_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : null;

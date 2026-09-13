@@ -8,7 +8,7 @@ import {
 import BulkReplaceModal from '../components/BulkReplaceModal';
 import Modal from '../components/Modal';
 
-const API_BASE = 'http://localhost:3001/api';
+import { API_BASE } from '../config';
 
 // Sıralama metrikleri. 'usalk_score' varsayılan: ölü listingleri bulmanın en hızlı yolu.
 const SORT_METRICS = [

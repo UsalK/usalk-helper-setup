@@ -8,7 +8,7 @@ import RECOMMENDED_DATA from './recommended_data.json';
 import { filterActiveProfiles, isSetProfile } from '../utils/profileFlags';
 import { buildPriceColumns, columnPriceOf, setColumnPrice } from '../utils/frameGroups';
 
-const API_BASE = 'http://localhost:3001/api';
+import { API_BASE } from '../config';
 
 const DEFAULT_PROFILES = filterActiveProfiles([
   { id: 'ratio_2_3', name: '2:3 Oranı (Dikey)', ratio: '2:3' },
@@ -65,6 +65,7 @@ export default function VariationProfiles() {
   
   // Matrix prices: { "size_frame": price }
   const [priceMap, setPriceMap] = useState({});
+  const [pricingNotice, setPricingNotice] = useState('');
   
   // Bulk tool
   const [bulkBasePrice, setBulkBasePrice] = useState('35');
@@ -106,6 +107,7 @@ export default function VariationProfiles() {
   };
 
   const handleEditRatio = (profile) => {
+    setPricingNotice('');
     setSelectedProfile(profile);
     setSizes(profile.sizes || []);
     setFrames(profile.frames || []);
@@ -127,6 +129,7 @@ export default function VariationProfiles() {
   };
 
   const loadRecommendedSizesAndFrames = () => {
+    setPricingNotice('');
     const key = recommendedKey(selectedProfile);
     const config = RECOMMENDED_DATA[key];
     if (config) {
@@ -156,20 +159,24 @@ export default function VariationProfiles() {
     return true;
   };
 
-  const loadRecommendedPrices = () => {
+  const loadRecommendedPrices = (preset = 'standard') => {
     const key = recommendedKey(selectedProfile);
     const config = RECOMMENDED_DATA[key];
-    if (config && config.prices) {
+    const recommendedPrices = preset === 'volume'
+      ? config?.pricing_presets?.volume?.prices
+      : config?.prices;
+    if (recommendedPrices) {
       const newMap = { ...priceMap };
       sizes.forEach(s => {
         frames.forEach(f => {
           const key = `${s}_${f}`;
-          if (config.prices[key] !== undefined) {
-            newMap[key] = config.prices[key];
+          if (recommendedPrices[key] !== undefined) {
+            newMap[key] = recommendedPrices[key];
           }
         });
       });
       setPriceMap(newMap);
+      setPricingNotice(`${preset === 'volume' ? 'Sürümden Kazanç' : 'Standart Fiyatlandırma'} matrise aktarıldı. Değişiklikleri saklamak için Kaydet'e basın.`);
     }
   };
 
@@ -888,6 +895,57 @@ export default function VariationProfiles() {
 
               {/* Right side: Dynamic Price Matrix grid */}
               <div className="lg:col-span-2 space-y-6">
+                {RECOMMENDED_DATA[recommendedKey(selectedProfile)]?.pricing_presets?.volume && (
+                  <section aria-labelledby="recommended-pricing-title" className="bg-[#0e1726] border border-[#1e293b] rounded-2xl p-6 space-y-4">
+                    <div>
+                      <h3 id="recommended-pricing-title" className="text-sm font-semibold text-white flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-amber-500" />
+                        Önerilen Fiyatlandırma Profilleri
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                        Satış yaklaşımınıza uygun tabloyu seçin. Tüm fiyatlar USD cinsinden, indirim uygulanmamış liste fiyatlarıdır.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="bg-[#151f32] border border-[#334155] rounded-xl p-4 flex flex-col gap-3">
+                        <div>
+                          <h4 className="text-sm font-semibold text-white">Standart Fiyatlandırma</h4>
+                          <p className="text-xs text-amber-400 mt-1">Ürün başına kazanç odaklı</p>
+                        </div>
+                        <p className="text-xs text-slate-300 leading-relaxed flex-1">
+                          Daha seçici satış temposunu ve ürün başına kâr marjını ön planda tutan yaklaşım.
+                          Özellikle çerçeveli ürünlerde daha yüksek fiyat konumlandırması isteyen mağazalar için mevcut standart tablo.
+                        </p>
+                        <button type="button" disabled={!isRecommendedConfig()} onClick={() => loadRecommendedPrices('standard')}
+                          className="w-full bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold px-4 py-3 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                          Standart Fiyatları Uygula
+                        </button>
+                      </div>
+                      <div className="bg-[#151f32] border border-emerald-500/30 rounded-xl p-4 flex flex-col gap-3">
+                        <div>
+                          <h4 className="text-sm font-semibold text-white">Sürümden Kazanç</h4>
+                          <p className="text-xs text-emerald-400 mt-1">Satış adedi odaklı</p>
+                        </div>
+                        <p className="text-xs text-slate-300 leading-relaxed flex-1">
+                          Özellikle çerçeveli ürünlerde daha ulaşılabilir fiyatlarla daha fazla sipariş hedefleyen yaklaşım.
+                          Ürün başına daha düşük marjı satış adediyle dengelemek isteyen mağazalar için alternatif tablo.
+                        </p>
+                        <button type="button" disabled={!isRecommendedConfig()} onClick={() => loadRecommendedPrices('volume')}
+                          className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-bold px-4 py-3 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                          Sürümden Kazanç Fiyatlarını Uygula
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Sürümden Kazanç tablosu her boyut ve çerçevede daha düşük değildir; bazı Roll ve StretchedWood fiyatları standart tablodan yüksektir.
+                      Kendi maliyetlerinizi ve uygulayacağınız indirimi dikkate alarak matrisi düzenleyebilirsiniz.
+                    </p>
+                    {!isRecommendedConfig() && (
+                      <p className="text-xs text-amber-400">Bu profilleri uygulamak için önce önerilen boyut ve çerçeve seçeneklerini yükleyin.</p>
+                    )}
+                    {pricingNotice && <p role="status" className="text-xs text-emerald-400">{pricingNotice}</p>}
+                  </section>
+                )}
                 {sizes.length > 0 && frames.length > 0 ? (
                   <div className="bg-[#0e1726] border border-[#1e293b] rounded-2xl p-6 space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#1e293b]">
@@ -913,10 +971,10 @@ export default function VariationProfiles() {
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2">
-                        {isRecommendedConfig() && (
+                        {isRecommendedConfig() && !RECOMMENDED_DATA[recommendedKey(selectedProfile)]?.pricing_presets?.volume && (
                           <button
                             type="button"
-                            onClick={loadRecommendedPrices}
+                            onClick={() => loadRecommendedPrices()}
                             className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-bold px-4.5 py-3 rounded-xl shadow-lg shadow-emerald-500/10 flex items-center space-x-1.5 transition-all transform hover:scale-[1.02]"
                           >
                             <Sparkles className="w-4 h-4" />

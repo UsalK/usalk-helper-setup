@@ -19,7 +19,7 @@ import {
 import { warpImage } from '../utils/homography';
 import { pickPanelRow } from '../utils/panelRow';
 
-const API_BASE = 'http://localhost:3001/api';
+import { API_BASE, API_ORIGIN } from '../config';
 
 // Bir oranın mockup dizilim ayarının varsayılanı (backend/services/MockupOrder.js ile aynı)
 const DEFAULT_ORDER = {
@@ -2551,7 +2551,7 @@ export default function TemplateStudio() {
                     <div key={img.id} className="bg-[#151f32] border border-[#1e293b] rounded-2xl p-3 flex flex-col justify-between group hover:border-slate-800 transition-colors">
                       <div className="aspect-[4/3] rounded-xl bg-slate-950 border border-[#1e293b] overflow-hidden mb-3 relative">
                         <img
-                          src={`http://localhost:3001/${img.background_path}`}
+                          src={`${API_ORIGIN}/${img.background_path}`}
                           alt=""
                           className="w-full h-full object-cover"
                         />
@@ -2626,7 +2626,7 @@ export default function TemplateStudio() {
             {index}
           </span>
           <div className="w-12 h-9 shrink-0 rounded-lg overflow-hidden bg-slate-950 border border-[#1e293b]">
-            <img src={`http://localhost:3001/${tpl.background_path}`} alt="" className="w-full h-full object-cover" />
+            <img src={`${API_ORIGIN}/${tpl.background_path}`} alt="" className="w-full h-full object-cover" />
           </div>
           <div className="flex-1 min-w-0">
             <span className="block text-[11px] font-semibold text-white truncate">{tpl.name}</span>
@@ -2901,7 +2901,7 @@ export default function TemplateStudio() {
                     }`}
                   >
                     <div className="w-12 h-9 shrink-0 rounded-lg overflow-hidden bg-slate-950 border border-[#1e293b]">
-                      <img src={`http://localhost:3001/${tpl.background_path}`} alt="" className="w-full h-full object-cover" />
+                      <img src={`${API_ORIGIN}/${tpl.background_path}`} alt="" className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <span className="block text-[11px] font-semibold text-white truncate">{tpl.name}</span>
@@ -2966,7 +2966,7 @@ export default function TemplateStudio() {
                   <div className={`relative aspect-square rounded-xl overflow-hidden bg-slate-950 border ${
                     idx === 0 ? 'border-emerald-500/60' : 'border-[#1e293b]'
                   }`}>
-                    <img src={`http://localhost:3001/${item.background_path}`} alt="" className="w-full h-full object-cover" />
+                    <img src={`${API_ORIGIN}/${item.background_path}`} alt="" className="w-full h-full object-cover" />
                     <span className={`absolute top-1 left-1 w-5 h-5 rounded-md text-[9px] font-bold flex items-center justify-center ${
                       idx === 0 ? 'bg-emerald-500 text-slate-950' : 'bg-slate-950/80 text-slate-200'
                     }`}>
@@ -3119,7 +3119,7 @@ export default function TemplateStudio() {
                     <div key={tpl.id} className="bg-[#0e1726] border border-[#1e293b] rounded-2xl overflow-hidden group hover:border-amber-500/30 transition-all flex flex-col justify-between">
                       <div className="relative aspect-[4/3] bg-slate-950 overflow-hidden">
                         <img 
-                          src={`http://localhost:3001/${tpl.background_path}`} 
+                          src={`${API_ORIGIN}/${tpl.background_path}`} 
                           alt={tpl.name}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
@@ -3758,7 +3758,7 @@ export default function TemplateStudio() {
                           >
                             <div className="w-24 h-24 bg-slate-950 rounded-xl overflow-hidden flex-shrink-0 relative border border-[#1e293b]">
                               <img 
-                                src={`http://localhost:3001/${tpl.background_path}`} 
+                                src={`${API_ORIGIN}/${tpl.background_path}`} 
                                 alt={tpl.name}
                                 className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                               />

@@ -3,6 +3,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import db, { getActiveShop, getShopStorageName, getProductStorageFolder } from '../db/db.js';
+import { SERVER_ORIGIN } from '../config/origin.js';
 
 const router = express.Router();
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -56,7 +57,7 @@ router.get('/list/:productId', (req, res, next) => {
     const mockups = files.map(file => {
       return {
         filename: file,
-        url: `http://localhost:3001/storage/${subPath.replace(/\\/g, '/')}/mockups/${productId}/${file}`
+        url: `${SERVER_ORIGIN}/storage/${subPath.replace(/\\/g, '/')}/mockups/${productId}/${file}`
       };
     });
     

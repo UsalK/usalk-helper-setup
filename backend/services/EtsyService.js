@@ -135,9 +135,13 @@ export function getEtsyCredentials() {
 // mağaza aynı anda yenileme isterse ikincisi birincinin token'ını alıyordu.
 const activeRefreshPromises = new Map();
 
-// Helper to get stored auth details and refresh them if expired
-export async function getValidToken() {
-  const auth = getActiveShop();
+// Helper to get stored auth details and refresh them if expired.
+// shopId verilirse o mağazanın token'ı kullanılır (ör. sipariş detayı, siparişin kendi
+// mağazasına aittir; başka sekmede aktif mağaza değişse bile yanlış mağazaya gitmemeli).
+export async function getValidToken(shopId = null) {
+  const auth = shopId
+    ? db.prepare('SELECT * FROM etsy_auth WHERE shop_id = ?').get(String(shopId))
+    : getActiveShop();
   
   if (!auth || !auth.access_token || auth.shop_id === 'default_shop') {
     throw new Error('Etsy hesabı bağlı değil. Lütfen Etsy panelinden mağazayı bağlayın.');
@@ -557,6 +561,53 @@ export async function updateListing(listing_id, listingData) {
       'x-api-key': `${client_id}:${client_secret}`,
       'Authorization': `Bearer ${access_token}`,
       'Content-Type': 'application/x-www-form-urlencoded'
+    }
+  });
+  return res.data;
+}
+
+/**
+ * Mağazanın siparişleri (receipt), yeniden eskiye. shopId verilmezse aktif mağaza.
+ * `transactions_r` izni gerekir; token bu izin olmadan alınmışsa Etsy 403 döner.
+ * @returns {Promise<{count: number, results: object[]}>}
+ */
+export async function getShopReceipts({ limit = 25, offset = 0, shopId = null, wasDelivered = null } = {}) {
+  const { access_token, client_id, client_secret, shop_id } = await getValidToken(shopId);
+  const url = `https://openapi.etsy.com/v3/application/shops/${shop_id}/receipts`;
+  const params = { limit, offset, sort_on: 'created', sort_order: 'desc' };
+  // Siparişte "teslim edildi" alanı yok; yalnızca bu filtreyle öğrenilebiliyor.
+  if (wasDelivered !== null) params.was_delivered = wasDelivered;
+  const res = await etsyHttp.get(url, {
+    params,
+    headers: {
+      'x-api-key': `${client_id}:${client_secret}`,
+      'Authorization': `Bearer ${access_token}`
+    }
+  });
+  return res.data;
+}
+
+/**
+ * Birden çok listingi görselleriyle tek istekte getirir (Etsy sınırı: 100 id).
+ * Herkese açık uç nokta; OAuth gerekmez, yalnızca API anahtarı.
+ */
+export async function getListingsWithImages(listingIds) {
+  if (!listingIds.length) return [];
+  const { client_id, client_secret } = getEtsyCredentials();
+  const res = await etsyHttp.get('https://openapi.etsy.com/v3/application/listings/batch', {
+    params: { listing_ids: listingIds.slice(0, 100).join(','), includes: 'Images' },
+    headers: { 'x-api-key': `${client_id}:${client_secret}` }
+  });
+  return res.data.results || [];
+}
+
+/** Listingin varyant bazlı envanteri (stok adetleri). `listings_r` izni gerekir. */
+export async function getListingInventory(listing_id, shopId = null) {
+  const { access_token, client_id, client_secret } = await getValidToken(shopId);
+  const res = await etsyHttp.get(`https://openapi.etsy.com/v3/application/listings/${listing_id}/inventory`, {
+    headers: {
+      'x-api-key': `${client_id}:${client_secret}`,
+      'Authorization': `Bearer ${access_token}`
     }
   });
   return res.data;

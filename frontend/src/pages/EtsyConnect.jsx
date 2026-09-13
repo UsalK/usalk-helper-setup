@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { Link2, Link2Off, RefreshCw, CheckCircle, AlertCircle, ShoppingBag, Clock, Zap, Trash2, ArrowRight } from 'lucide-react';
 
-const API_BASE = 'http://localhost:3001/api';
+import { API_BASE } from '../config';
 
 function formatTimeLeft(expiresAt) {
   if (!expiresAt) return null;

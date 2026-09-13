@@ -104,6 +104,101 @@ MARKETPLACE COMPLIANCE (this shop lost three listings to the rules below, with n
 
 4) THE DEPICTED OBJECT IS NOT THE PRODUCT. What is sold is always a printed artwork; the pot, lamp or rug inside the image is only subject matter. Never let a title or tag read as an offer of that object: "persian pottery", "antique ceramic vase" and "vintage brass lamp" all describe a collectible for sale and get classified as one. Keep every phrase anchored to the depiction — "ceramic vase artwork", "pottery still life art", "brass lamp illustration". Never call the depicted object antique, authentic, genuine, original, handmade or an artifact.`;
 
+/*
+ * Mağazadaki her ürün düz, pürüzsüz kanvasa BASKI. Ama görsellerin büyük kısmı
+ * alçı kabartma, oyma ahşap, taş mozaik ya da kalın boya dokusunun fotoğrafı/render'ı.
+ * Model gördüğünü yazınca başlığa "3D Textured", "Plaster Relief", "Wood Wall Art"
+ * giriyor ve alıcı fiziksel doku/malzeme bekleyip düz baskı alınca "yanlış tanım"
+ * şikâyeti açıyor. Kural 4'le aynı ilke: görseldeki yüzey ürünün yüzeyi değil.
+ *
+ * "look/effect/style" kaçamağına bilerek izin verilmiyor: arama sonucunda başlığın
+ * yarısı kesik görünüyor ve "3D Look Wall Art" orada "3D Wall Art" olarak okunuyor.
+ */
+export const PRODUCT_ACCURACY_PROMPT = `
+
+PRODUCT ACCURACY — THE PICTURED SURFACE IS NOT THE PRODUCT'S SURFACE (buyers have complained "I thought it was textured and a flat print arrived" — this is a false-description problem, not a style choice):
+Every item in this shop is a FLAT print on smooth canvas. Many artworks are images of textured plaster, carved wood, stone mosaic, metal or thick impasto paint, but the buyer receives only a flat printed picture of that surface — nothing they can feel, no depth, no other material.
+- Never use these words in ANY field (title, tags, description, visual_style, room): 3D, textured, texture, tactile, dimensional, relief, bas-relief, raised, embossed, sculpted, sculptural, wall sculpture, plaster, stucco, impasto, palette knife, thick paint, carved, wood carving. Softening them does not help — "3D Look", "Textured Effect", "Relief Style" and "Faux Plaster" still read as a physical product in a search thumbnail.
+- Never name a material as what the artwork is made of or printed on: wood, wooden, metal, glass, acrylic, stone, marble, concrete, tile, ceramic, gold leaf, gold foil. "Wood Wall Art", "Stone Mosaic Art", "Metal Print" and "Gold Leaf Painting" are all false. A material word is allowed only for an object clearly pictured INSIDE the scene ("Stone Bridge Landscape", "Wooden Boat Art").
+- Never present the item as an original or hand-made piece: hand painted, handmade, hand crafted, original painting, one of a kind, oil on canvas. Use "Wall Art" or "Art Print" as the product noun; a painterly image may be called "Oil Painting Style", never an oil painting.
+- Describe what the EYE sees in flat terms instead — shape, flow, line, colour, contrast, composition, mood: "Neutral Abstract Wave Art", "Earth Tone Organic Shapes Art", "Mosaic Pattern Wall Art", "Beige Minimalist Curves Print". In the description say what is pictured ("soft ivory waves", "interlocking earth-tone shapes"), never how the surface would feel to the touch or that it has depth.
+- This overrides every SEO instruction: a lost search phrase costs one click; a buyer who expected texture costs a refund, a bad review and a case against the shop.`;
+
+/*
+ * Prompt'a güvenmiyoruz; yukarıdaki yasak sanitizeText'teki gibi kodda da uygulanıyor.
+ * Sadece bağlamdan bağımsız olarak yanıltıcı olan kalıplar burada: çıplak "wood",
+ * "stone", "metal" resmedilen nesne olabilir ("Stone Bridge Landscape"), o yüzden
+ * malzeme kelimeleri yalnızca ürün ismiyle birleştiklerinde yakalanıyor.
+ * Sıra önemli: uzun kalıplar kısalardan önce silinmeli ("wood carving" > "carved").
+ */
+const SURFACE_CLAIM_PATTERNS = [
+  /\b(?:printed|painted)\s+on\s+(?:wood|metal|glass|acrylic|stone|plaster)\b/gi,
+  // "Stained Glass" bir üslup adı, malzeme iddiası değil; lookbehind onu korur.
+  // Yalnızca malzeme kelimesi silinir, ürün ismi kalır: "boho wood wall art" -> "boho wall art".
+  /\b(?:wood|wooden|metal|aluminum|aluminium|acrylic|(?<!stained\s)glass|stone|marble|concrete|tile|ceramic)(?=\s+(?:wall\s+)?(?:art\s+print|print|panel|plaque|sign|board|wall\s+art)\b)/gi,
+  /\b(?:stone|(?<!stained\s)glass|tile|ceramic|marble|pebble)(?=\s+mosaics?\b)/gi,
+  /\b(?:wood|hand)[\s-]*carv(?:ed|ing|ings)\b|\bcarved\s+wood\b/gi,
+  /\bbas[\s-]*relief\b|\brelief\s+(?:art|wall\s+art|sculpture|panel|painting|print)\b/gi,
+  /\bwall\s+sculptures?\b|\bsculpt(?:ed|ural)\b/gi,
+  /\bgold\s+(?:leaf|foil)\b/gi,
+  /\bpalette\s+knife\b|\bthick\s+paint\b|\bimpasto\b/gi,
+  /\bhand[\s-]*(?:painted|made|crafted)\b|\bhandmade\b|\boriginal\s+(?:painting|artwork)\b|\bone\s+of\s+a\s+kind\b|\boil\s+on\s+canvas\b/gi,
+  /\b(?:faux\s+)?(?:plaster|stucco)\b/gi,
+  /\b3\s*-?\s*d\b|\b(?:multi[\s-]*|three[\s-]*)?dimensional\b/gi,
+  /\btextur(?:e|ed|es|al)\b|\btactile\b|\bembossed\b|\braised\s+(?:texture|surface|pattern|design)\b/gi
+];
+
+// Silme sonrası geriye yalnızca bunlar kalırsa öbek bir şey anlatmıyor demektir.
+const SURFACE_LEFTOVER_WORDS = new Set([
+  'print', 'poster', 'artwork', 'piece', 'decor', 'design', 'style', 'art', 'wall', 'painting', 'canvas',
+  'look', 'effect', 'illusion', 'finish', 'faux', 'and', '&', 'with', 'of', 'the', 'a'
+]);
+
+export function hasSurfaceClaim(text) {
+  if (typeof text !== 'string' || !text) return false;
+  return SURFACE_CLAIM_PATTERNS.some(p => { p.lastIndex = 0; const hit = p.test(text); p.lastIndex = 0; return hit; });
+}
+
+/**
+ * Tek bir öbekten (başlık öbeği, tag, visual_style) yanıltıcı yüzey/malzeme ifadelerini siler.
+ * Geriye anlamlı bir şey kalmazsa '' döner — çağıran öbeği tamamen düşürür.
+ */
+export function stripSurfaceClaims(phrase) {
+  if (typeof phrase !== 'string') return '';
+  // İddia yoksa dokunma: "Wall Art" gibi generic ama doğru öbekler düşmemeli.
+  if (!hasSurfaceClaim(phrase)) return phrase;
+  let out = phrase;
+  for (const p of SURFACE_CLAIM_PATTERNS) {
+    p.lastIndex = 0;
+    out = out.replace(p, ' ');
+  }
+  if (out !== phrase) {
+    // Silinen kelimenin bıraktığı "Look", "Effect" gibi artıklar tek başına anlamsız.
+    out = out.replace(/\b(?:look|effect|illusion|finish|faux)\b/gi, ' ')
+      .replace(/(^|\s)-+(?=\s|$)/g, ' ')
+      .replace(/\s+/g, ' ').trim()
+      .replace(/^(?:(?:and|&|with)\s+)+/i, '')
+      .replace(/(?:\s+(?:and|&|with))+$/i, '')
+      .trim();
+  }
+  const words = out.split(/\s+/).filter(Boolean);
+  if (!words.length || words.every(w => SURFACE_LEFTOVER_WORDS.has(w.toLowerCase()))) return '';
+  return out;
+}
+
+/**
+ * Açıklamada kelime silmek dilbilgisini bozar ("A textured landscape" -> "A landscape"
+ * iyi, ama "sculpted plaster waves create depth" onarılamaz). Yanıltıcı ifadeyi taşıyan
+ * cümle bütünüyle çıkarılır; hepsi taşıyorsa metin olduğu gibi kalır ve çağıran uyarır.
+ */
+export function stripSurfaceClaimSentences(text) {
+  if (typeof text !== 'string' || !hasSurfaceClaim(text)) return { text: text || '', removed: 0, unresolved: false };
+  const sentences = text.match(/[^.!?]+[.!?]*\s*/g) || [text];
+  const kept = sentences.filter(s => !hasSurfaceClaim(s));
+  if (!kept.length) return { text, removed: 0, unresolved: true };
+  return { text: kept.join('').trim(), removed: sentences.length - kept.length, unresolved: false };
+}
+
 // Modelin "yok" demesinin tüm biçimleri; boş konu alanını isim sanmamak için.
 const EMPTY_SUBJECT = /^(none|no|n\/a|na|null|nil|unknown|generic|anonymous|unnamed|invented|fictional|not applicable)\.?$/i;
 
@@ -162,7 +257,7 @@ function publicDomainCanonicalsIn(text) {
 }
 
 /** visual_style alanı sansürsüz — tek kuralı somut olmak. İki prompt da bunu kullanır. */
-const VISUAL_STYLE_SPEC = "1 to 3 CONCRETE art style tags. This field is NOT censored and must never be vague: name the movement, period or technique the artwork is genuinely painted in, e.g. 'Vienna Secession', 'Art Nouveau', 'Post-Impressionist', 'Ukiyo-e', 'Bauhaus', 'De Stijl', 'Art Deco', 'Mid-Century Modern', 'Gold Leaf Mosaic', 'Baroque Chiaroscuro', 'Byzantine Mosaic'. Vague answers like 'Modern', 'Beautiful', 'Colorful', 'Wall Art', 'Painting', 'Artistic' are FAILURES. If the piece clearly echoes a public-domain artist you may name them here directly (e.g. 'Gustav Klimt'). Never return an empty list.";
+const VISUAL_STYLE_SPEC = "1 to 3 CONCRETE art style tags. This field is NOT censored and must never be vague: name the movement, period or technique the artwork is genuinely painted in, e.g. 'Vienna Secession', 'Art Nouveau', 'Post-Impressionist', 'Ukiyo-e', 'Bauhaus', 'De Stijl', 'Art Deco', 'Mid-Century Modern', 'Baroque Chiaroscuro', 'Byzantine Mosaic'. Name the visual style only — never a surface, depth or material ('3D', 'Textured', 'Relief', 'Plaster', 'Impasto', 'Wood', 'Gold Leaf'): the item is a flat print and these values are reused as tags. Vague answers like 'Modern', 'Beautiful', 'Colorful', 'Wall Art', 'Painting', 'Artistic' are FAILURES. If the piece clearly echoes a public-domain artist you may name them here directly (e.g. 'Gustav Klimt'). Never return an empty list.";
 
 /**
  * Alan tipine göre sanatçı/marka adı temizliği.
@@ -522,13 +617,13 @@ ${usableSections.map(s => `- ${s.title}`).join('\n')}`
 
   // Shortened and token-efficient system prompt
   const systemPrompt = platform === 'shopify'
-    ? `You are a Shopify E-commerce copywriter. Analyze the artwork image and generate a short, clean, premium product title (max 50 characters, 4-6 words) and search-optimized product metadata in JSON format. Do not use keyword stuffing. Always identify the artwork's art movement or technique explicitly in visual_style.`
-    : `You are an Etsy SEO expert. Analyze the artwork image and return a JSON object with optimized listing metadata. Always identify the artwork's art movement or technique explicitly. Public-domain artists may be referenced as a style; living artists and brands may not. Sanctioned-country names, real named events and transport brands are forbidden in every field — the MARKETPLACE COMPLIANCE rules override every SEO instruction. Return ONLY a single JSON object without markdown formatting.`;
+    ? `You are a Shopify E-commerce copywriter. Analyze the artwork image and generate a short, clean, premium product title (max 50 characters, 4-6 words) and search-optimized product metadata in JSON format. Do not use keyword stuffing. Always identify the artwork's art movement or technique explicitly in visual_style. The product is a flat canvas print: never describe it as 3D, textured, sculpted, hand-painted or made of another material, even when the image shows such a surface.`
+    : `You are an Etsy SEO expert. Analyze the artwork image and return a JSON object with optimized listing metadata. Always identify the artwork's art movement or technique explicitly. Public-domain artists may be referenced as a style; living artists and brands may not. Sanctioned-country names, real named events and transport brands are forbidden in every field. The product is a flat print on smooth canvas: never describe it as 3D, textured, relief, sculpted, plaster, hand-painted or made of wood, stone, metal or any other material, even when the image shows such a surface. The MARKETPLACE COMPLIANCE and PRODUCT ACCURACY rules override every SEO instruction. Return ONLY a single JSON object without markdown formatting.`;
 
   const promptText = platform === 'shopify'
     ? `Please analyze the attached image and generate Shopify metadata.
 Shop Style: ${shopStyle}
-Product Type: Canvas / Poster
+Product Type: Flat canvas print (no physical texture, never hand-painted)
 
 Format your response as a single, valid JSON object matching this schema:
 {
@@ -541,16 +636,16 @@ Format your response as a single, valid JSON object matching this schema:
   "holiday": [],
   "room": ["rooms where this art fits best"]
 }
-${ARTIST_POLICY_PROMPT}${LISTING_COMPLIANCE_PROMPT}
+${ARTIST_POLICY_PROMPT}${LISTING_COMPLIANCE_PROMPT}${PRODUCT_ACCURACY_PROMPT}
 CRITICAL: Return ONLY the JSON object. Do not include markdown code block formatting (like \`\`\`json).`
     : `Analyze the image of this wall art and return Etsy metadata JSON.
-CONTEXT ONLY (never quote or paraphrase this line in your output): the item is a physical canvas artwork shipped to the buyer, never a digital download, printable or file. Use this only to avoid digital-product wording.
+CONTEXT ONLY (never quote or paraphrase this line in your output): the item is a flat print on smooth canvas shipped to the buyer — never a digital download, printable or file, and never a textured, 3D, sculpted, hand-painted or wood/stone/metal object, whatever surface the image shows. Use this only to avoid digital-product and false-material wording.
 Shop Style: ${shopStyle}
 Target Market: ${targetMarket}
 
 Schema:
 {
-  "title": "Traditional Etsy keyword title: comma-separated keyword phrases, 90-140 characters in total — aim for 120-135, never exceed 140. Write 5 to 8 phrases, each 2-4 words and each a real phrase a buyer would type into search. The FIRST phrase is the primary keyword and must say what the item is (e.g. 'Sculpted Face Wall Art'); order the rest by search value — subject, style, colour, room, recipient/occasion. Separate phrases ONLY with commas: no dashes, pipes or slashes anywhere in the title. Use Title Case for every significant word. Do not repeat a phrase, and no single word may appear more than twice in the whole title. Must end on a complete phrase, never cut off mid-phrase. NO generic gift terms. NEVER state the framing or mounting option (no 'Framed', 'Stretched', 'Rolled', 'Ready to Hang') — the buyer chooses that at checkout and a wrong promise causes returns.",
+  "title": "Traditional Etsy keyword title: comma-separated keyword phrases, 90-140 characters in total — aim for 120-135, never exceed 140. Write 5 to 8 phrases, each 2-4 words and each a real phrase a buyer would type into search. The FIRST phrase is the primary keyword and must say what the item is (e.g. 'Abstract Face Wall Art'); order the rest by search value — subject, style, colour, room, recipient/occasion. Separate phrases ONLY with commas: no dashes, pipes or slashes anywhere in the title. Use Title Case for every significant word. Do not repeat a phrase, and no single word may appear more than twice in the whole title. Must end on a complete phrase, never cut off mid-phrase. NO generic gift terms. NEVER state the framing or mounting option (no 'Framed', 'Stretched', 'Rolled', 'Ready to Hang') — the buyer chooses that at checkout and a wrong promise causes returns.",
   "tags": ["Exactly 24 multi-word phrases. THREE words is the sweet spot, two is the absolute minimum, four is the hard maximum. Aim for 15-20 characters and USE that space: a tag must read like a complete phrase a buyer types into the search bar, never a stub. 'calm wall', 'spa decor', 'boho wall' are FAILURES — 'calm meditation art', 'spa reception decor', 'boho bedroom art' are correct. If you cannot hit the range exactly, err LONG rather than short; an over-long tag is fixable, a vague short one is worthless. Avoid vague two-word fillers like 'old poster' or 'nature view' — every tag must be something a real buyer would type. NEVER use the word 'digital'. NEVER use material, print or mounting terms ('canvas', 'stretched canvas', 'archival', 'aged paper texture'). DO NOT repeat words from the title. Each tag must target a DIFFERENT search intent (subject, mood, colour, room, style, recipient, occasion)."],
   "description": "2-3 sentences. What the artwork depicts, the mood it creates, and who it suits. Primary keyword in first 40 chars. In English. NEVER mention material, canvas, framing, printing, sizing, quality claims or shipping — the shop appends its own standard section covering all of that, so repeating it wastes the description's most valuable opening. Write about the IMAGE, not the product spec.",
   "depicted_subject": "WHO or WHAT is pictured, when it is a recognisable PUBLIC-DOMAIN person, historical figure, mythological character or landmark — e.g. 'Vincent Van Gogh', 'Cleopatra', 'Medusa', 'Eiffel Tower'. This is about the SUBJECT of the artwork, never about its style. Return an empty string if the figure is anonymous, generic or invented. Never guess.",
@@ -562,7 +657,7 @@ Schema:
   "secondary_color": "second most prominent colour, plain English",
   "orientation": "one of: vertical, horizontal, square",
   "subject": "one of: landscape, seascape, botanical, abstract, architecture, animal, figure, still life"${sectionSchemaLine}
-}${sectionInstruction}${setInstruction}${ARTIST_POLICY_PROMPT}${LISTING_COMPLIANCE_PROMPT}
+}${sectionInstruction}${setInstruction}${ARTIST_POLICY_PROMPT}${LISTING_COMPLIANCE_PROMPT}${PRODUCT_ACCURACY_PROMPT}
 CRITICAL: Return ONLY raw JSON without markdown blocks.`;
 
   // AI Agent runs locally; named models go only to the selected OpenRouter model.
@@ -835,6 +930,20 @@ CRITICAL: Return ONLY raw JSON without markdown blocks.`;
   let title = parsed.title ? String(parsed.title) : '';
   title = sanitizeText(title, 'title', { keepBare: depictedBareNames });
 
+  // Yanıltıcı yüzey/malzeme ifadeleri öbek öbek temizlenir: "3D Wave Wall Art" ->
+  // "Wave Wall Art", "Plaster Relief Art" gibi geriye bir şey kalmayan öbek düşer.
+  const surfaceHits = [];
+  if (hasSurfaceClaim(title)) {
+    const before = title;
+    const seenPhrases = new Set();
+    title = title.split(',')
+      .map(ph => stripSurfaceClaims(ph.trim()))
+      .filter(ph => ph && !seenPhrases.has(ph.toLowerCase()) && seenPhrases.add(ph.toLowerCase()))
+      .join(', ');
+    surfaceHits.push('title');
+    console.warn(`[Product Accuracy] Başlıktaki yüzey/malzeme iddiası temizlendi: "${before}" -> "${title}"`);
+  }
+
   // Model konuyu tanıyıp adını başlığa yazmayı atlarsa ("artist portrait", "legendary
   // master") listing'in en değerli anahtar kelimesi kaybolur. Set öbeğiyle aynı mantık:
   // ikinci öbek olarak enjekte edilir, aşağıdaki 140 karakter kırpması taşmayı halleder.
@@ -885,6 +994,14 @@ CRITICAL: Return ONLY raw JSON without markdown blocks.`;
   // Sanitize description
   let description = parsed.description || parsed.description_hook || '';
   description = sanitizeText(String(description), 'description');
+  const descAccuracy = stripSurfaceClaimSentences(description);
+  if (descAccuracy.removed || descAccuracy.unresolved) {
+    surfaceHits.push('description');
+    console.warn(descAccuracy.unresolved
+      ? '[Product Accuracy] UYARI: açıklamanın her cümlesi yüzey/malzeme iddiası taşıyor, elle kontrol edin.'
+      : `[Product Accuracy] Açıklamadan yüzey/malzeme iddiası taşıyan ${descAccuracy.removed} cümle çıkarıldı.`);
+  }
+  description = descAccuracy.text;
   if (description.length > 5000) {
     description = description.substring(0, 5000).trim();
   }
@@ -899,7 +1016,7 @@ CRITICAL: Return ONLY raw JSON without markdown blocks.`;
   }
 
   let descriptionHook = parsed.description_hook || parsed.description || '';
-  descriptionHook = sanitizeText(String(descriptionHook), 'description');
+  descriptionHook = stripSurfaceClaimSentences(sanitizeText(String(descriptionHook), 'description')).text;
   if (descriptionHook.length > 160) {
     descriptionHook = descriptionHook.substring(0, 160).trim();
   }
@@ -913,6 +1030,13 @@ CRITICAL: Return ONLY raw JSON without markdown blocks.`;
   for (let tag of rawTags) {
     if (typeof tag !== 'string') continue;
     let cleanTag = sanitizeText(tag, 'tags', { keepBare: depictedBareNames }).trim();
+    if (hasSurfaceClaim(cleanTag)) {
+      let stripped = stripSurfaceClaims(cleanTag);
+      if (stripped.split(/\s+/).length < 2) stripped = ''; // "gold leaf abstract" -> "abstract" bir tag değil
+      console.log(`[Product Accuracy] Tag "${cleanTag}" yüzey/malzeme iddiası taşıyordu -> ${stripped ? `"${stripped}"` : 'düşürüldü'}.`);
+      if (!surfaceHits.includes('tags')) surfaceHits.push('tags');
+      cleanTag = stripped;
+    }
     if (!cleanTag) continue;
     
     // REPAIR tags over Etsy's 20-char limit instead of dropping them. Gözlenen
@@ -962,8 +1086,10 @@ CRITICAL: Return ONLY raw JSON without markdown blocks.`;
     'architecture', 'animal', 'figure', 'still life'
   ]);
 
+  // visual_style ve room bağlamsal yedek tag'lere dönüşüyor; temizlenmezse
+  // "3d relief wall art" kapıdan değil pencereden girer.
   const visualStyle = Array.isArray(parsed.visual_style)
-    ? parsed.visual_style.map(v => sanitizeText(v, 'visual_style').trim()).filter(Boolean).slice(0, 3)
+    ? parsed.visual_style.map(v => stripSurfaceClaims(sanitizeText(v, 'visual_style').trim())).filter(Boolean).slice(0, 3)
     : [];
   const occasion = Array.isArray(parsed.occasion)
     ? parsed.occasion.map(o => sanitizeText(o, 'tags').trim()).filter(Boolean)
@@ -972,7 +1098,7 @@ CRITICAL: Return ONLY raw JSON without markdown blocks.`;
     ? parsed.holiday.map(h => sanitizeText(h, 'tags').trim()).filter(Boolean)
     : [];
   const room = Array.isArray(parsed.room)
-    ? parsed.room.map(r => sanitizeText(r, 'tags').trim()).filter(Boolean)
+    ? parsed.room.map(r => stripSurfaceClaims(sanitizeText(r, 'tags').trim())).filter(Boolean)
     : [];
 
   // Elemeyi kaç AI tag'i geçti? Kısaltılanlar da sayılır — kısaltılmış bir
@@ -1115,7 +1241,8 @@ CRITICAL: Return ONLY raw JSON without markdown blocks.`;
       contextualTagsUsed,
       genericTagsUsed,
       avgTagLength: Number(avgTagLength.toFixed(1)),
-      fallbackTagsUsed: contextualTagsUsed + genericTagsUsed
+      fallbackTagsUsed: contextualTagsUsed + genericTagsUsed,
+      surfaceClaimsRemovedFrom: surfaceHits // modelin PRODUCT ACCURACY kuralını çiğnediği alanlar
     }
   };
 }

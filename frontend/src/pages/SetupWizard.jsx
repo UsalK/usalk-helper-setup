@@ -5,7 +5,7 @@ import {
   Globe, Store, Truck, Sparkles, PartyPopper, ChevronRight, RefreshCw, SkipForward
 } from 'lucide-react';
 
-const API_BASE = 'http://localhost:3001/api';
+import { API_BASE } from '../config';
 
 const STEPS = [
   { id: 'hosts', title: 'Alan Adı & Etsy App', icon: Globe, hint: 'hosts dosyası ve API bilgileri' },

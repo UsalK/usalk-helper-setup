@@ -7,7 +7,7 @@ import {
   Power, PowerOff, Sparkles, X, Check, Clock, AlertCircle, Loader2
 } from 'lucide-react';
 
-const API_BASE = 'http://localhost:3001/api';
+import { API_BASE } from '../config';
 const PAGE_LIMIT = 20;
 
 export default function RenewManager({ etsyConnected, activeShop }) {

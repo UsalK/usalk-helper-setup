@@ -18,6 +18,8 @@ import storageRouter from './routes/storage.js';
 import bulkJobsRouter from './routes/bulkjobs.js';
 import versionRouter from './routes/version.js';
 import setupRouter from './routes/setup.js';
+import ordersRouter from './routes/orders.js';
+import upscaleRouter from './routes/upscale.js';
 import { resumePendingJobs } from './services/BulkJobService.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -69,6 +71,8 @@ app.use('/api/shopify', shopifyRouter);
 app.use('/api/storage', storageRouter);
 app.use('/api/bulk-jobs', bulkJobsRouter);
 app.use('/api/version', versionRouter);
+app.use('/api/orders', ordersRouter);
+app.use('/api/upscale', upscaleRouter);
 
 
 // Global Error Handler
@@ -79,8 +83,14 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
-  // Sunucu kapanmışken yarım kalan toplu yükleme işlerini devam ettir
-  resumePendingJobs();
+  // Sunucu kapanmışken yarım kalan toplu yükleme işlerini devam ettir.
+  // Veritabanı kopyasıyla çalışan ikinci bir kurulum (geliştirme worktree'si)
+  // gerçek mağazaya yükleme yapmasın diye .env'de kapatılabilir.
+  if (process.env.SKIP_JOB_RESUME === '1') {
+    console.log('[BulkJobs] SKIP_JOB_RESUME=1: yarım kalan işler devam ettirilmedi.');
+  } else {
+    resumePendingJobs();
+  }
 });
 // Updated AI Service & Routes
 

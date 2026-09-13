@@ -61,6 +61,8 @@ function Wait-LogMarker([string]$LogFile, [string]$Pattern, [int]$TimeoutSec = 9
     while ((Get-Date) -lt $deadline) {
         if (Test-Path $LogFile) {
             $content = Get-Content -Path $LogFile -Raw -ErrorAction SilentlyContinue
+            # Vite bazen renkli yazar ("Local" ile ":" arasinda ANSI kodu); eslesmeden once temizle
+            if ($content) { $content = $content -replace "\x1b\[[0-9;]*m", '' }
             if ($content -and ($content -match $Pattern)) { return $true }
         }
         Start-Sleep -Milliseconds 500

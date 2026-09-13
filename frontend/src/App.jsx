@@ -10,6 +10,7 @@ import EtsyConnect from './pages/EtsyConnect';
 import PriceUpdate from './pages/PriceUpdate';
 import Analytics from './pages/Analytics';
 import RenewManager from './pages/RenewManager';
+import Orders from './pages/Orders';
 import SetupWizard from './pages/SetupWizard';
 
 // Shopify Pages
@@ -20,12 +21,12 @@ import StorageCleanup from './pages/StorageCleanup';
 import BulkJobWidget from './components/BulkJobWidget';
 import { SHOPIFY_ENABLED } from './config/features';
 
-const API_BASE = 'http://localhost:3001/api';
+import { API_BASE } from './config';
 
 // Adres çubuğu ile senkronize edilen sayfalar. Sidebar menüsüyle aynı olmalı.
 const VALID_PAGES = {
   etsy: [
-    'dashboard', 'renew-manager', 'analytics', 'price-update', 'bulk-upload',
+    'dashboard', 'orders', 'renew-manager', 'analytics', 'price-update', 'bulk-upload',
     'templates', 'variations', 'storage', 'settings', 'etsy-connect', 'setup'
   ],
   shopify: [
@@ -171,6 +172,8 @@ export default function App() {
     switch (currentPage) {
       case 'dashboard':
         return <Dashboard key={shopKey} appMode={appMode} etsyConnected={appMode === 'etsy' ? etsyConnected : false} activeShop={appMode === 'etsy' ? activeShop : null} />;
+      case 'orders':
+        return <Orders key={shopKey} etsyConnected={etsyConnected} activeShop={activeShop} />;
       case 'renew-manager':
         return <RenewManager key={shopKey} etsyConnected={etsyConnected} activeShop={activeShop} />;
       case 'analytics':

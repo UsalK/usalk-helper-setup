@@ -14,7 +14,7 @@ import {
   DEFAULT_PLACEMENT, DEFAULT_CORNERS
 } from '../utils/panels';
 
-const API_BASE = 'http://localhost:3001/api';
+import { API_BASE, API_ORIGIN } from '../config';
 
 const matchProfileForImage = (imageSrc, profiles) => {
   return new Promise((resolve) => {
@@ -827,10 +827,10 @@ export default function BulkUpload({ etsyConnected }) {
 
     // 1. Generate normal mockups
     if (mockupTpls.length > 0) {
-      const productImg = await loadImage(`http://localhost:3001/${p.image_path}`);
+      const productImg = await loadImage(`${API_ORIGIN}/${p.image_path}`);
       
       for (const tpl of mockupTpls) {
-        const bgImg = await loadImage(`http://localhost:3001/${tpl.background_path}`);
+        const bgImg = await loadImage(`${API_ORIGIN}/${tpl.background_path}`);
         const ratios = (tpl.config.compatible_ratios && tpl.config.compatible_ratios.length > 0)
           ? tpl.config.compatible_ratios
           : ['2:3'];
@@ -935,7 +935,7 @@ export default function BulkUpload({ etsyConnected }) {
     // 2. Statik şablonlarda da kısa kenarı tamamla.
     for (const tpl of staticTpls) {
       try {
-        const staticImg = await loadImage(`http://localhost:3001/${tpl.background_path}`);
+        const staticImg = await loadImage(`${API_ORIGIN}/${tpl.background_path}`);
         const ratios = (tpl.config.compatible_ratios && tpl.config.compatible_ratios.length > 0)
           ? tpl.config.compatible_ratios
           : ['2:3'];
@@ -1479,7 +1479,7 @@ export default function BulkUpload({ etsyConnected }) {
                   <label className="block text-[11px] font-semibold text-slate-400">Base Image</label>
                   <div className="aspect-[4/3] rounded-2xl bg-slate-950 border border-[#1e293b] overflow-hidden relative">
                     <img
-                      src={`http://localhost:3001/${selectedProduct.image_path}`}
+                      src={`${API_ORIGIN}/${selectedProduct.image_path}`}
                       alt=""
                       className="w-full h-full object-cover"
                     />
@@ -1716,7 +1716,7 @@ export default function BulkUpload({ etsyConnected }) {
                       <div className="cursor-pointer flex-grow" onClick={() => handleOpenDetail(p)}>
                         <div className="aspect-[4/3] bg-slate-950 overflow-hidden relative">
                           <img 
-                            src={`http://localhost:3001/${p.image_path}`} 
+                            src={`${API_ORIGIN}/${p.image_path}`} 
                             alt="" 
                             className="w-full h-full object-cover"
                           />
@@ -1836,7 +1836,7 @@ export default function BulkUpload({ etsyConnected }) {
                       <div>
                         <div className="aspect-[4/3] bg-slate-950 overflow-hidden relative">
                           <img 
-                            src={`http://localhost:3001/${p.image_path}`} 
+                            src={`${API_ORIGIN}/${p.image_path}`} 
                             alt="" 
                             className="w-full h-full object-cover"
                           />
