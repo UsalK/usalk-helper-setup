@@ -2,13 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import {
   Check, Copy, ExternalLink, Loader2, AlertCircle, ShieldCheck,
-  Globe, Store, Truck, Sparkles, PartyPopper, ChevronRight, RefreshCw, SkipForward
+  KeyRound, Store, Truck, Sparkles, PartyPopper, ChevronRight, RefreshCw, SkipForward
 } from 'lucide-react';
 
 import { API_BASE } from '../config';
 
 const STEPS = [
-  { id: 'hosts', title: 'Alan Adı & Etsy App', icon: Globe, hint: 'hosts dosyası ve API bilgileri' },
+  { id: 'etsy', title: 'Etsy App', icon: KeyRound, hint: 'callback adresi ve API bilgileri' },
   { id: 'shop', title: 'Mağaza Bağlantısı', icon: Store, hint: 'Etsy hesabınıza yetki verin' },
   { id: 'profiles', title: 'Satış Profilleri', icon: Truck, hint: 'kargo, iade ve işleme süresi' },
   { id: 'ai', title: 'Yapay Zekâ Anahtarı', icon: Sparkles, hint: 'OpenRouter API key' },
@@ -84,10 +84,8 @@ export default function SetupWizard({ onFinish, onShopChange }) {
   const [error, setError] = useState(null);
 
   // Adım 1
-  const [domain, setDomain] = useState('');
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
-  const [hostsConfirmed, setHostsConfirmed] = useState(false);
 
   // Adım 2
   const [polling, setPolling] = useState(false);
@@ -126,20 +124,18 @@ export default function SetupWizard({ onFinish, onShopChange }) {
     try {
       const res = await axios.get(`${API_BASE}/setup/status`);
       setStatus(res.data);
-      if (res.data.selectedDomain && !domain) setDomain(res.data.selectedDomain);
-      if (res.data.hostsConfirmed) setHostsConfirmed(true);
       return res.data;
     } catch (err) {
       setError('Kurulum durumu okunamadı. Backend çalışıyor mu?');
       return null;
     }
-  }, [domain]);
+  }, []);
 
   useEffect(() => {
     loadStatus().then(s => {
       if (!s) return;
       // Kullanıcıyı ilk tamamlanmamış adıma bırak, baştan başlatma.
-      const order = ['hosts', 'shop', 'profiles', 'ai'];
+      const order = ['etsy', 'shop', 'profiles', 'ai'];
       const firstOpen = order.findIndex(k => !s.steps?.[k]);
       setStepIndex(firstOpen === -1 ? 4 : firstOpen);
     });
@@ -177,8 +173,6 @@ export default function SetupWizard({ onFinish, onShopChange }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
-  const selectedDomainInfo = status?.domains?.find(d => d.domain === domain) || null;
-
   const run = async (fn) => {
     setBusy(true);
     setError(null);
@@ -194,10 +188,8 @@ export default function SetupWizard({ onFinish, onShopChange }) {
 
   const saveStep1 = () => run(async () => {
     await axios.post(`${API_BASE}/setup/env/etsy`, {
-      domain,
       client_id: clientId,
-      client_secret: clientSecret,
-      hostsConfirmed
+      client_secret: clientSecret
     });
     await loadStatus();
     setStepIndex(1);
@@ -344,104 +336,43 @@ export default function SetupWizard({ onFinish, onShopChange }) {
 
           <ErrorBox message={error} />
 
-          {/* ADIM 1 — hosts + Etsy app */}
-          {current.id === 'hosts' && (
+          {/* ADIM 1 — Etsy app */}
+          {current.id === 'etsy' && (
             <div className="space-y-6">
-              <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4 space-y-2">
-                <p className="text-[11px] text-amber-200/90 leading-relaxed">
-                  Etsy, OAuth dönüş adresinde <strong>IP kabul etmiyor</strong> — sadece alan adı.
-                  Bu yüzden seçtiğiniz alan adının bilgisayarınızda <code className="text-amber-400">127.0.0.1</code>'e
-                  yönlenmesi gerekiyor. Bu işlem yönetici izni istediği için <strong>uygulama sizin adınıza yapamaz</strong>.
+              <div className="space-y-2">
+                <p className="text-[11px] font-semibold text-slate-400">
+                  Etsy uygulamanızın callback adresi bu olmalı:
                 </p>
+                <div className="flex items-center gap-2 bg-[#0b0f19] border border-[#1e293b] rounded-xl px-3 py-2.5">
+                  <code className="flex-1 text-xs text-sky-400 font-mono truncate">{status.redirectUri}</code>
+                  <CopyButton value={status.redirectUri} label="Kopyala" />
+                </div>
+                <a
+                  href="https://www.etsy.com/developers/your-apps"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 text-[11px] text-sky-400 hover:text-sky-300 font-semibold"
+                >
+                  Etsy Developers panelini aç <ExternalLink size={11} />
+                </a>
               </div>
 
-              <Field label="Alan adı seçin" hint="Üçü de Etsy uygulamasına callback olarak kayıtlı. Herhangi birini seçebilirsiniz.">
-                <div className="grid sm:grid-cols-3 gap-2">
-                  {status.domains?.map(d => (
-                    <button
-                      key={d.domain}
-                      onClick={() => setDomain(d.domain)}
-                      className={`px-3 py-3 rounded-xl border text-xs font-semibold transition-colors ${
-                        domain === d.domain
-                          ? 'bg-amber-500/10 border-amber-500/40 text-amber-400'
-                          : 'bg-[#0b0f19] border-[#1e293b] text-slate-300 hover:border-slate-600'
-                      }`}
-                    >
-                      {d.label}
-                    </button>
-                  ))}
-                </div>
-              </Field>
-
-              {selectedDomainInfo && (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <p className="text-[11px] font-semibold text-slate-400">
-                      1) Şu satırı hosts dosyasının sonuna ekleyin:
-                    </p>
-                    <div className="flex items-center gap-2 bg-[#0b0f19] border border-[#1e293b] rounded-xl px-3 py-2.5">
-                      <code className="flex-1 text-xs text-emerald-400 font-mono truncate">
-                        {selectedDomainInfo.hostsLine.replace('\t', '    ')}
-                      </code>
-                      <CopyButton value={selectedDomainInfo.hostsLine} label="Satırı kopyala" />
-                    </div>
-                    <div className="flex items-center gap-2 bg-[#0b0f19] border border-[#1e293b] rounded-xl px-3 py-2.5">
-                      <code className="flex-1 text-[11px] text-slate-400 font-mono truncate">{status.hostsFile}</code>
-                      <CopyButton value={status.hostsFile} label="Yolu kopyala" />
-                    </div>
-                    <p className="text-[10px] text-slate-500 leading-relaxed">
-                      Not Defteri'ni <strong>yönetici olarak</strong> açıp bu dosyayı düzenleyin, kaydedin.
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <p className="text-[11px] font-semibold text-slate-400">
-                      2) Etsy uygulamanızın callback adresi bu olmalı:
-                    </p>
-                    <div className="flex items-center gap-2 bg-[#0b0f19] border border-[#1e293b] rounded-xl px-3 py-2.5">
-                      <code className="flex-1 text-xs text-sky-400 font-mono truncate">{selectedDomainInfo.redirectUri}</code>
-                      <CopyButton value={selectedDomainInfo.redirectUri} label="Kopyala" />
-                    </div>
-                    <a
-                      href="https://www.etsy.com/developers/your-apps"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 text-[11px] text-sky-400 hover:text-sky-300 font-semibold"
-                    >
-                      Etsy Developers panelini aç <ExternalLink size={11} />
-                    </a>
-                  </div>
-
-                  <label className="flex items-start gap-2.5 bg-[#0b0f19] border border-[#1e293b] rounded-xl px-3 py-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={hostsConfirmed}
-                      onChange={e => setHostsConfirmed(e.target.checked)}
-                      className="mt-0.5 accent-amber-500"
-                    />
-                    <span className="text-[11px] text-slate-300 leading-relaxed">
-                      hosts dosyasına satırı ekledim ve kaydettim, callback adresi Etsy uygulamamda kayıtlı.
-                    </span>
-                  </label>
-
-                  <div className="grid sm:grid-cols-2 gap-4 pt-2">
-                    <Field label="Etsy API Key (client_id)">
-                      <input className={inputClass} value={clientId} onChange={e => setClientId(e.target.value)} placeholder="abcd1234..." />
-                    </Field>
-                    <Field label="Etsy Shared Secret (client_secret)">
-                      <input type="password" className={inputClass} value={clientSecret} onChange={e => setClientSecret(e.target.value)} placeholder="••••••••" />
-                    </Field>
-                  </div>
-                  <p className="text-[10px] text-slate-500 flex items-center gap-1.5">
-                    <ShieldCheck size={11} className="text-emerald-500" />
-                    Bu bilgiler yalnızca bilgisayarınızdaki <code>backend/.env</code> dosyasına yazılır; git'e dahil edilmez.
-                  </p>
-                </div>
-              )}
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Field label="Etsy API Key (client_id)">
+                  <input className={inputClass} value={clientId} onChange={e => setClientId(e.target.value)} placeholder="abcd1234..." />
+                </Field>
+                <Field label="Etsy Shared Secret (client_secret)">
+                  <input type="password" className={inputClass} value={clientSecret} onChange={e => setClientSecret(e.target.value)} placeholder="••••••••" />
+                </Field>
+              </div>
+              <p className="text-[10px] text-slate-500 flex items-center gap-1.5">
+                <ShieldCheck size={11} className="text-emerald-500" />
+                Bu bilgiler yalnızca bilgisayarınızdaki <code>backend/.env</code> dosyasına yazılır; git'e dahil edilmez.
+              </p>
 
               <button
                 onClick={saveStep1}
-                disabled={busy || !domain || !hostsConfirmed || !clientId || !clientSecret}
+                disabled={busy || !clientId || !clientSecret}
                 className="w-full bg-amber-500 hover:bg-amber-400 disabled:bg-[#1e293b] disabled:text-slate-600 text-slate-950 font-bold text-xs py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
               >
                 {busy ? <Loader2 size={14} className="animate-spin" /> : <ChevronRight size={14} />}

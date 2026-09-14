@@ -117,6 +117,25 @@ export function clearEtsyCache() {
   console.log('[Cache] Etsy metadata cache cleared.');
 }
 
+/**
+ * Etsy app'ine kayıtlı tek callback adresi. Etsy IP kabul etmiyor ama `localhost`
+ * alan adını kabul ediyor; bu yüzden hosts dosyası düzenlemeye gerek kalmadı.
+ */
+export const DEFAULT_REDIRECT_URI = 'http://localhost:3001/api/etsy/callback';
+
+/**
+ * OAuth redirect_uri'si. ETSY_REDIRECT_URI ile başka port/adres verilebilir; ancak
+ * eski sürümlerin yazdığı `*.local` adresleri Etsy app'inden kaldırıldı, onlar
+ * OAuth'u kıracağı için yok sayılır.
+ */
+export function getRedirectUri() {
+  const configured = process.env.ETSY_REDIRECT_URI?.trim();
+  if (!configured || /^https?:\/\/[^/:]+\.local(?=[:/]|$)/i.test(configured)) {
+    return DEFAULT_REDIRECT_URI;
+  }
+  return configured;
+}
+
 export function getEtsyCredentials() {
   const client_id = process.env.ETSY_CLIENT_ID;
   const client_secret = process.env.ETSY_CLIENT_SECRET;

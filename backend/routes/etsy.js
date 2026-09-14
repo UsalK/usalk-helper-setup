@@ -49,7 +49,7 @@ router.get('/auth-url', (req, res, next) => {
     const verifierStr = JSON.stringify(verifier);
     stmt.run('etsy_code_verifier', verifierStr, verifierStr);
     
-    const redirectUri = process.env.ETSY_REDIRECT_URI || 'http://localhost:3001/api/etsy/callback';
+    const redirectUri = EtsyService.getRedirectUri();
     // transactions_r: siparişleri okumak için (sipariş → kaynak görsel → upscale).
     // ETSY_SCOPES ile daraltılabilir; ör. geliştirme kopyası yalnızca okuma izni ister.
     const scope = process.env.ETSY_SCOPES || 'listings_r listings_w listings_d shops_r shops_w transactions_r';
@@ -90,7 +90,7 @@ router.get('/callback', async (req, res, next) => {
     const verifier = JSON.parse(verifierRow.value);
     const { client_id, client_secret } = EtsyService.getEtsyCredentials();
     
-    const redirectUri = process.env.ETSY_REDIRECT_URI || 'http://localhost:3001/api/etsy/callback';
+    const redirectUri = EtsyService.getRedirectUri();
     
     // Exchange authorization code for access tokens
     const response = await axios.post('https://api.etsy.com/v3/public/oauth/token', 

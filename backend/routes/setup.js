@@ -5,7 +5,7 @@
  * için uygulama hiçbir şeyi bilmeden açılır. Bu router, kullanıcıyı zorunlu
  * sırayla ilerletir:
  *
- *   1. hosts dosyası + Etsy app bilgileri  (bu olmadan OAuth callback'i dönemez)
+ *   1. Etsy app bilgileri                  (bu olmadan OAuth başlatılamaz)
  *   2. mağaza bağlama                       (bu olmadan Etsy API çağrılamaz)
  *   3. kargo/iade/işleme profilleri         (bu olmadan listing yüklenemez)
  *   4. OpenRouter anahtarı                  (bu olmadan SEO üretimi çalışmaz)
@@ -23,24 +23,6 @@ import * as EtsyService from '../services/EtsyService.js';
 const router = express.Router();
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ENV_PATH = join(__dirname, '../.env');
-
-/**
- * Etsy app'ine kayıtlı callback URL'leri. Etsy, OAuth isteğindeki redirect_uri'nin
- * app ayarlarındaki bir kayıtla BİREBİR eşleşmesini şart koşuyor ve IP adresi
- * kabul etmiyor — sadece domain. Bu yüzden seçilen domain'in hosts dosyasında
- * 127.0.0.1'e yönlendirilmesi gerekiyor; uygulama bunu kendi yapamaz çünkü
- * hosts dosyası yönetici izni ister.
- */
-export const CALLBACK_DOMAINS = [
-  { domain: 'usalk-art.local', label: 'usalk-art.local' },
-  { domain: 'aziz.local', label: 'aziz.local' },
-  { domain: 'metheus.local', label: 'metheus.local' }
-];
-
-const HOSTS_FILE = 'C:\\Windows\\System32\\drivers\\etc\\hosts';
-
-const redirectUriFor = (domain) => `http://${domain}:3001/api/etsy/callback`;
-const hostsLineFor = (domain) => `127.0.0.1\t${domain}`;
 
 /** Ayar tablosundaki global (mağazadan bağımsız) bayraklar. */
 function getGlobalFlag(key) {
@@ -102,20 +84,9 @@ const hasEnv = (key) => Boolean(process.env[key] && process.env[key].trim());
  */
 router.get('/status', async (req, res, next) => {
   try {
-    const redirectUri = process.env.ETSY_REDIRECT_URI || '';
-    const selectedDomain =
-      CALLBACK_DOMAINS.find(d => redirectUri.includes(d.domain))?.domain || null;
-
     const status = {
-      hostsConfirmed: getGlobalFlag('setup_hosts_confirmed') === true,
-      selectedDomain,
-      hostsLine: selectedDomain ? hostsLineFor(selectedDomain) : null,
-      hostsFile: HOSTS_FILE,
-      domains: CALLBACK_DOMAINS.map(d => ({
-        ...d,
-        redirectUri: redirectUriFor(d.domain),
-        hostsLine: hostsLineFor(d.domain)
-      })),
+      // Etsy app'inde kayıtlı olması gereken callback; sihirbaz kopyalatır.
+      redirectUri: EtsyService.getRedirectUri(),
       etsyCredentials: hasEnv('ETSY_CLIENT_ID') && hasEnv('ETSY_CLIENT_SECRET'),
       openRouterKey: hasEnv('OPENROUTER_API_KEY'),
       shopConnected: false,
@@ -164,14 +135,8 @@ router.get('/status', async (req, res, next) => {
     }
 
     // Adım kilidi: her adım kendinden öncekiler bitmeden açılmaz.
-    //
-    // Bağlı bir mağaza varsa hosts adımı ONAY KUTUSU olmadan da tamamlanmış
-    // sayılır: OAuth callback'i dönebilmiş olması, alan adının 127.0.0.1'e
-    // çözüldüğünün ve callback'in Etsy app'inde kayıtlı olduğunun kanıtı.
-    // Aksi halde zaten çalışan bir kurulum, sihirbazı ilk kez gördüğünde
-    // .env'inde hazır duran bilgileri yeniden girmek zorunda kalırdı.
     status.steps = {
-      hosts: (status.hostsConfirmed || status.shopConnected) && status.etsyCredentials,
+      etsy: status.etsyCredentials,
       shop: status.shopConnected,
       profiles: Boolean(status.defaults.default_shipping_profile_id && status.defaults.default_return_policy_id),
       ai: status.openRouterKey
@@ -185,36 +150,25 @@ router.get('/status', async (req, res, next) => {
 });
 
 /**
- * Adım 1: seçilen domain + Etsy app bilgileri.
- * Domain seçimi ETSY_REDIRECT_URI'yi belirler; Etsy app'inde kayıtlı olmayan bir
- * domain OAuth'u kırar, o yüzden serbest metin kabul edilmiyor.
+ * Adım 1: Etsy app bilgileri. Callback adresi sabit (localhost); eski sürümden
+ * kalma bir `*.local` adresi .env'de duruyorsa burada localhost'a çevrilir.
  */
 router.post('/env/etsy', (req, res, next) => {
   try {
-    const { domain, client_id, client_secret, hostsConfirmed } = req.body;
+    const { client_id, client_secret } = req.body;
 
-    const known = CALLBACK_DOMAINS.find(d => d.domain === domain);
-    if (!known) {
-      return res.status(400).json({
-        error: `Geçersiz domain. Etsy app'inde kayıtlı olanlar: ${CALLBACK_DOMAINS.map(d => d.domain).join(', ')}`
-      });
-    }
     if (!client_id?.trim() || !client_secret?.trim()) {
       return res.status(400).json({ error: 'Etsy API Key (client_id) ve Shared Secret (client_secret) zorunludur.' });
     }
-    if (!hostsConfirmed) {
-      return res.status(400).json({ error: 'hosts dosyasını düzenlediğinizi onaylamadan devam edilemez.' });
-    }
 
+    const redirectUri = EtsyService.getRedirectUri();
     writeEnvKeys({
       ETSY_CLIENT_ID: client_id.trim(),
       ETSY_CLIENT_SECRET: client_secret.trim(),
-      ETSY_REDIRECT_URI: redirectUriFor(domain)
+      ETSY_REDIRECT_URI: redirectUri
     });
-    setGlobalFlag('setup_hosts_confirmed', true);
-    setGlobalFlag('setup_callback_domain', domain);
 
-    res.json({ success: true, redirectUri: redirectUriFor(domain) });
+    res.json({ success: true, redirectUri });
   } catch (err) {
     next(err);
   }

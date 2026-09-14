@@ -82,7 +82,7 @@ sahipseniz ve veritabanınız yoksa bu adımlar tam veri kurtarma sağlamaz.
 4. Mağazaları, seçili mağazayı, fiyatları, kargo ayarlarını, açıklamayı ve birkaç
    şablon/mockupu kontrol edin. Yeni klasöre göre değişmesi gereken kullanıcıya
    özel dış dosya yolları varsa ilgili ayardan düzeltin. Yeni bilgisayara geçişte
-   hosts/Node.js gibi bilgisayara özgü kurulum adımlarını ayrıca tamamlayın.
+   Node.js gibi bilgisayara özgü kurulum adımlarını ayrıca tamamlayın.
 5. Her şey doğruysa masaüstü kısayolunuzu **yeni klasördeki `run_hidden.vbs`**
    dosyasına yönlendirin; durdurma kısayolunu da yeni `run_stop.vbs` dosyasına bağlayın.
    Eski kısayol kendiliğinden yeni sürüme geçmez.
