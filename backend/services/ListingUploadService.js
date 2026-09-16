@@ -15,6 +15,7 @@ import db, { getActiveShop, getShopStorageName, getProductStorageFolder } from '
 import * as EtsyService from './EtsyService.js';
 import { orderMockupFiles } from './MockupOrder.js';
 import { DEFAULT_LISTING_QUANTITY } from './listingShared.js';
+import { prepareArtworkColors, sendArtworkColors } from './ArtworkColors.js';
 import {
   STYLE_MAPPING,
   OCCASION_MAPPING,
@@ -175,6 +176,12 @@ export async function uploadProductToEtsy(input) {
         .slice(0, 13);
     }
     
+    // Analyse the original artwork, never the room/frame in its mockups.
+    // Validate the taxonomy before creating a remote draft.
+    const artworkColors = await prepareArtworkColors(
+      join(__dirname, '../..', product.image_path), Number(taxonomy_id), EtsyService
+    );
+
     // Yarım kalan bir yüklemeyi DEVAM ETTİR, yeniden oluşturma.
     //
     // createListing basarili olup sonraki adimlardan biri patladiginda (tipik
@@ -417,6 +424,11 @@ export async function uploadProductToEtsy(input) {
         }
       }
     }
+    // Write attributes after inventory; colour failures must keep the upload
+    // retryable instead of marking an incomplete listing as successful.
+    await sendArtworkColors(listing_id, artworkColors, EtsyService, { clearSecondary: isResume });
+    console.log(`[Upload] Listing ${listing_id} renkleri: ${artworkColors.colors.map(c => c.name).join(', ')}`);
+
     // 6.5. Activate listing if state is active (since createDraftListing only creates drafts)
     if (state === 'active') {
       console.log(`Activating listing ${listing_id} on Etsy...`);

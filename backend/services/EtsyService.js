@@ -87,6 +87,7 @@ const cache = {
 };
 
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
+const taxonomyPropertiesCache = new Map();
 
 function getCachedData(key) {
   const now = Date.now();
@@ -104,6 +105,7 @@ function setCachedData(key, data) {
 }
 
 export function clearEtsyCache() {
+  taxonomyPropertiesCache.clear();
   cache.sections = null;
   cache.shippingProfiles = null;
   cache.returnPolicies = null;
@@ -471,15 +473,44 @@ export async function updateListingInventory(listing_id, inventoryData) {
   return res.data;
 }
 
+export async function getTaxonomyProperties(taxonomyId) {
+  const id = Number(taxonomyId);
+  if (!Number.isSafeInteger(id) || id <= 0) throw new Error('Geçersiz Etsy kategori ID.');
+  const cached = taxonomyPropertiesCache.get(id);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) return cached.properties;
+  const { client_id, client_secret } = getEtsyCredentials();
+  const res = await etsyHttp.get(`https://openapi.etsy.com/v3/application/seller-taxonomy/nodes/${id}/properties`, {
+    headers: { 'x-api-key': `${client_id}:${client_secret}` }
+  });
+  if (!Array.isArray(res.data.results)) throw new Error('Etsy kategori özellikleri alınamadı.');
+  taxonomyPropertiesCache.set(id, { timestamp: Date.now(), properties: res.data.results });
+  return res.data.results;
+}
+
+export async function deleteListingProperty(listing_id, property_id) {
+  const { access_token, client_id, client_secret, shop_id } = await getValidToken();
+  try {
+    await etsyHttp.delete(`https://openapi.etsy.com/v3/application/shops/${shop_id}/listings/${listing_id}/properties/${property_id}`, {
+      headers: { 'x-api-key': `${client_id}:${client_secret}`, 'Authorization': `Bearer ${access_token}` }
+    });
+  } catch (err) {
+    if (err.response?.status !== 404) throw err;
+  }
+}
+
 export async function updateListingProperty(listing_id, property_id, propertyData) {
   const { access_token, client_id, client_secret, shop_id } = await getValidToken();
   const url = `https://openapi.etsy.com/v3/application/shops/${shop_id}/listings/${listing_id}/properties/${property_id}`;
 
-  const res = await etsyHttp.put(url, propertyData, {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(propertyData)) {
+    if (value !== null && value !== undefined) params.set(key, Array.isArray(value) ? value.join(',') : String(value));
+  }
+  const res = await etsyHttp.put(url, params, {
     headers: {
       'x-api-key': `${client_id}:${client_secret}`,
       'Authorization': `Bearer ${access_token}`,
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/x-www-form-urlencoded'
     }
   });
   return res.data;

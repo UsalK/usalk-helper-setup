@@ -22,6 +22,7 @@ import { generateSEO } from './KimiService.js';
 import { getMockupPool } from './MockupPool.js';
 import { orderMockupFiles } from './MockupOrder.js';
 import { buildInventoryPayload } from './listingShared.js';
+import { prepareArtworkColors, sendArtworkColors } from './ArtworkColors.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '../..');
@@ -170,6 +171,11 @@ export async function updateListingFromProduct(input) {
     };
   }
 
+  // The existing listing keeps its category, which may differ from defaults.
+  const [existingListing] = await EtsyService.getListingsWithImages([listingId]);
+  if (!existingListing?.taxonomy_id) throw new Error('Renkler için mevcut Etsy kategorisi alınamadı.');
+  const artworkColors = await prepareArtworkColors(imageAbs, existingListing.taxonomy_id, EtsyService);
+
   // 3) Metin ve ölçü alanlarını güncelle
   onStep('Listing metni güncelleniyor');
   const settings = {};
@@ -299,6 +305,9 @@ export async function updateListingFromProduct(input) {
 
   if (uploadedCount === 0) {
     console.warn(`[Update] Listing ${listingId} için mockup bulunamadı, görseller değiştirilmedi.`);
+  } else {
+    onStep('Ana ve ikincil renk gönderiliyor');
+    await sendArtworkColors(listingId, artworkColors, EtsyService, { clearSecondary: true });
   }
 
   db.prepare('UPDATE products SET status = ? WHERE id = ?').run('live', productId);
