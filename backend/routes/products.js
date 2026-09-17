@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { exec } from 'child_process';
+import { detectArtworkColors } from '../services/ArtworkColors.js';
 import db, { getActiveShop, getShopStorageName, getPlatformUploadPath, getRawActiveShopify, getProductStorageFolder } from '../db/db.js';
 
 const router = express.Router();
@@ -307,6 +308,46 @@ router.post('/batch-variation-profile', (req, res, next) => {
       db.exec('ROLLBACK');
       throw txErr;
     }
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Yüklemede Etsy'ye gidecek ana/ikincil rengi önceden gösterir. Yükleme de aynı
+ * detectArtworkColors'ı aynı görselle çağırdığı için kartta görünen renk,
+ * gönderilenle birebir aynıdır. Görsel değişmedikçe sonuç önbellekten döner.
+ */
+const artworkColorCache = new Map(); // abs yol -> { mtimeMs, colors }
+
+router.post('/artwork-colors', async (req, res, next) => {
+  try {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids.slice(0, 500).map(String) : [];
+    const result = {};
+    const getProduct = db.prepare('SELECT id, image_path FROM products WHERE id = ?');
+
+    for (const id of ids) {
+      const product = getProduct.get(id);
+      if (!product?.image_path) {
+        result[id] = { error: 'Ürün görseli yok.' };
+        continue;
+      }
+      const abs = join(__dirname, '../..', product.image_path);
+      try {
+        const { mtimeMs } = fs.statSync(abs);
+        const cached = artworkColorCache.get(abs);
+        if (cached?.mtimeMs === mtimeMs) {
+          result[id] = { colors: cached.colors };
+          continue;
+        }
+        const colors = await detectArtworkColors(abs);
+        artworkColorCache.set(abs, { mtimeMs, colors });
+        result[id] = { colors };
+      } catch (err) {
+        result[id] = { error: err.code === 'ENOENT' ? 'Görsel dosyası bulunamadı.' : err.message };
+      }
+    }
+    res.json(result);
   } catch (err) {
     next(err);
   }

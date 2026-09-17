@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createCanvas } from '@napi-rs/canvas';
-import { detectArtworkColors, mapArtworkColorProperties, sendArtworkColors } from '../services/ArtworkColors.js';
+import { detectArtworkColors, mapArtworkColorProperties, sendArtworkColors, rankArtworkColors } from '../services/ArtworkColors.js';
 
 function artwork(stripes, transparent = false) {
   const canvas = createCanvas(100, 100);
@@ -31,6 +31,34 @@ test('primary/secondary are ordered by area, with all tones in one colour family
   assert.deepEqual(colors.map(c => c.name), ['Blue', 'Red']);
   assert.ok(Math.abs(colors[0].share - 0.65) < 0.01);
   assert.ok(Math.abs(colors[1].share - 0.25) < 0.01);
+});
+
+const nameOf = hex => rankArtworkColors(new Uint8ClampedArray([...hex.match(/../g).map(v => parseInt(v, 16)), 255]))[0].name;
+
+test('named shades land in the colour family a buyer would use', () => {
+  const expected = {
+    Pink: ['ff00ff', 'ff69b4', 'fa8072', 'c9a9a6', 'de98ab', 'ffc0cb'],
+    Purple: ['b784a7', '673147', 'b57edc', '4b0082'],
+    Red: ['dc143c', '800020', 'e2725b', 'b7410e', 'cc2222'],
+    Orange: ['ff7f50', 'ffcba4', 'cc7722', 'ff8000'],
+    Brown: ['7b3f00', '795033'],
+    Yellow: ['e1ad01', 'd4af37', 'f5d343'],
+    Beige: ['f3ead3', 'd2b48c', 'ead8bb'],
+    Green: ['808000', '9caf88', '71bc9b', '228b22', '50c878'],
+    Blue: ['008080', '40e0d0', '1f2f5a', '87ceeb'],
+    Gray: ['36454f', '8b7d6b', '808080'],
+    Black: ['080808'],
+    White: ['ffffff']
+  };
+  for (const [family, hexes] of Object.entries(expected)) {
+    for (const hex of hexes) assert.equal(nameOf(hex), family, `#${hex}`);
+  }
+});
+
+test('muted neutrals do not outvote the hue that defines a pastel artwork', async () => {
+  // Geniş krem gökyüzü + daha küçük soluk pembe alan: pembe ana renk olmalı.
+  const colors = await detectArtworkColors(artwork([['#efe6d6', 65], ['#d9a3a8', 35]]));
+  assert.deepEqual(colors.map(c => c.name), ['Pink', 'Beige']);
 });
 
 test('neutral colours and artwork backgrounds count towards visible area', async () => {

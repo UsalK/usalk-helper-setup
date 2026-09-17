@@ -16,6 +16,55 @@ import {
 
 import { API_BASE, API_ORIGIN } from '../config';
 
+/**
+ * Yüklemede Etsy'ye ana/ikincil renk olarak gidecek renk aileleri
+ * (backend/services/ArtworkColors.js). Daire rengi ailenin tipik tonu.
+ */
+const ARTWORK_COLOR_SWATCHES = {
+  Black: { label: 'Siyah', hex: '#111111' },
+  White: { label: 'Beyaz', hex: '#ffffff' },
+  Gray: { label: 'Gri', hex: '#8a8a8a' },
+  Beige: { label: 'Bej', hex: '#e3d3b6' },
+  Brown: { label: 'Kahverengi', hex: '#7b5033' },
+  Red: { label: 'Kırmızı', hex: '#cc2222' },
+  Orange: { label: 'Turuncu', hex: '#f07a24' },
+  Yellow: { label: 'Sarı', hex: '#f5d343' },
+  Green: { label: 'Yeşil', hex: '#2f8a4a' },
+  Blue: { label: 'Mavi', hex: '#2a6fcc' },
+  Purple: { label: 'Mor', hex: '#7a3fa8' },
+  Pink: { label: 'Pembe', hex: '#ef85a9' }
+};
+
+/** Kartta "Renkler" başlığı altında, Etsy'ye gidecek iki rengi gösterir. */
+function ArtworkColors({ entry }) {
+  return (
+    <div className="border-t border-[#1e293b] pt-3">
+      <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Renkler</span>
+      {!entry ? (
+        <span className="text-[10px] text-slate-500">Analiz ediliyor...</span>
+      ) : entry.error ? (
+        <span className="text-[10px] text-rose-400" title={entry.error}>Renk bulunamadı</span>
+      ) : (
+        <div className="flex items-center gap-4">
+          {entry.colors.map((c, i) => {
+            const sw = ARTWORK_COLOR_SWATCHES[c.name] || { label: c.name, hex: '#64748b' };
+            return (
+              <div
+                key={c.name}
+                className="flex items-center gap-1.5 min-w-0"
+                title={`${i === 0 ? 'Ana' : 'İkincil'} renk: ${sw.label} (${c.name}) — görselin %${Math.round(c.share * 100)}'i`}
+              >
+                <span className="w-4 h-4 rounded-full border border-slate-500/60 shrink-0" style={{ backgroundColor: sw.hex }} />
+                <span className="text-[11px] font-semibold text-slate-300 truncate">{sw.label}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const matchProfileForImage = (imageSrc, profiles) => {
   return new Promise((resolve) => {
     const img = new Image();
@@ -262,6 +311,8 @@ export default function BulkUpload({ etsyConnected }) {
 
   // Main lists
   const [products, setProducts] = useState([]);
+  // ürün id -> { image_path, colors } | { image_path, error }
+  const [artworkColors, setArtworkColors] = useState({});
   const [selectedDraftIds, setSelectedDraftIds] = useState([]);
   
   // Metadata & Templates
@@ -338,6 +389,29 @@ export default function BulkUpload({ etsyConnected }) {
       fetchEtsyMetadata();
     }
   }, [etsyConnected]);
+
+  // Taslak kartlarında gösterilecek renkleri, görseli değişen/yeni ürünler için çek.
+  useEffect(() => {
+    const missing = products.filter(p =>
+      p.status !== 'live' && p.image_path && artworkColors[p.id]?.image_path !== p.image_path
+    );
+    if (missing.length === 0) return;
+    let cancelled = false;
+    axios.post(`${API_BASE}/products/artwork-colors`, { ids: missing.map(p => p.id) })
+      .then(res => {
+        if (cancelled) return;
+        setArtworkColors(prev => {
+          const next = { ...prev };
+          for (const p of missing) {
+            next[p.id] = { image_path: p.image_path, ...(res.data[p.id] || { error: 'Renk analizi yapılamadı.' }) };
+          }
+          return next;
+        });
+      })
+      .catch(err => console.error('Renk analizi alınamadı:', err));
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products]);
 
   const fetchProducts = async () => {
     try {
@@ -1735,6 +1809,8 @@ export default function BulkUpload({ etsyConnected }) {
                               <span className="text-[9px] text-slate-500 font-semibold">+{p.tags.length - 4} daha</span>
                             )}
                           </div>
+
+                          <ArtworkColors entry={artworkColors[p.id]?.image_path === p.image_path ? artworkColors[p.id] : null} />
 
                           <div className="grid grid-cols-2 gap-4 border-t border-[#1e293b] pt-3 text-xs">
                             <div>

@@ -1,26 +1,20 @@
 import { createCanvas, loadImage } from '@napi-rs/canvas';
 
-// Multiple shades vote for the same Etsy colour, so e.g. navy and sky blue
-// cannot occupy both colour attributes. Metallic finishes cannot be inferred
-// from RGB pixels; use ordinary colour families instead.
-const SWATCHES = {
-  Black: ['080808', '202020'],
-  White: ['ffffff', 'f5f5f5'],
-  Gray: ['555555', '808080', 'b5b5b5', 'd5d5d5'],
-  Beige: ['f5f5dc', 'ead8bb', 'c9b79c', 'e8dfcf'],
-  Brown: ['4b2e20', '795033', 'a07045', '967969'],
-  Red: ['ff0000', 'cc2222', '800020'],
-  Orange: ['ff8000', 'e56b2f', 'c45424'],
-  Yellow: ['ffff00', 'f5d343', 'c8a527'],
-  Green: ['00ff00', '008000', '245839', '7d9568', '808000', '8fcfa1'],
-  Blue: ['0000ff', '0077cc', '172b55', '88bbdd', '008b9a', '00ffff'],
-  Purple: ['800080', '663399', 'a080c0', 'aa00ff'],
-  Pink: ['ffc0cb', 'ef85a9', 'ff1493', 'ff00ff']
-};
+// Pikselleri renk ailesine LCh (açıklık, doygunluk, ton açısı) kurallarıyla
+// ayırıyoruz. Eski yöntem her pikseli birkaç sabit örnek renge en yakın olana
+// atıyordu; soluk pembe/mor tonlar "Kahverengi"ye, pastel resimlerin çoğu
+// "Bej/Gri"ye düşüyordu. Ton açısı, insanın rengi adlandırma biçimine daha yakın.
+//
+// Ayarlar 21 yağlıboya görsellik elle etiketlenmiş bir sette seçildi (hata
+// %69 -> %2) ve ayrıca bilinen renk adlarıyla (magenta, somon, zeytin, antrasit
+// ...) sağlandı: backend/scripts/artworkColors.test.mjs.
+const NEUTRAL_CHROMA = 8;     // bunun altı renksiz sayılır
+const NEUTRAL_WEIGHT = 0.25;  // renksiz pikselin oyu (renkli piksel en fazla 1)
+const CHROMA_CAP = 15;        // bu doygunluktan sonrası tam oy
+const TEAL_CUT = 170;         // yeşil/mavi sınırı (turkuaz mavi sayılır)
+const NEUTRALS = new Set(['Black', 'White', 'Gray', 'Beige', 'Brown']);
 
-// CIELAB distance groups colours by perceived difference instead of treating
-// the non-linear RGB channel values as equally spaced.
-function toLab(r, g, b) {
+function toLch(r, g, b) {
   const [R, G, B] = [r, g, b].map(v => {
     const s = v / 255;
     return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
@@ -29,40 +23,76 @@ function toLab(r, g, b) {
   const x = f((0.4124564 * R + 0.3575761 * G + 0.1804375 * B) / 0.95047);
   const y = f(0.2126729 * R + 0.7151522 * G + 0.072175 * B);
   const z = f((0.0193339 * R + 0.119192 * G + 0.9503041 * B) / 1.08883);
-  return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+  const a = 500 * (x - y);
+  const bb = 200 * (y - z);
+  const h = Math.atan2(bb, a) * 180 / Math.PI;
+  return [116 * y - 16, Math.hypot(a, bb), h < 0 ? h + 360 : h];
 }
 
-const palette = Object.entries(SWATCHES).flatMap(([name, hexes]) =>
-  hexes.map(hex => ({ name, lab: toLab(...hex.match(/../g).map(v => parseInt(v, 16))) }))
-);
+/** L (0-100), C (doygunluk) ve h (ton açısı, derece) değerini Etsy renk ailesine çevirir. */
+export function colorFamily(L, C, h) {
+  if (C < NEUTRAL_CHROMA || (L < 35 && C < 12)) {
+    if (L < 20) return 'Black';
+    if (L > 90) return 'White';
+    if (C >= 3 && h >= 40 && h < 110 && L >= 60) return 'Beige';
+    return 'Gray';
+  }
+  if (L < 18 && C < 20) return 'Black';
+  if (h >= 345 || h < 22) {                       // pembe / kırmızı / mürdüm
+    if (C >= 35) return L >= 65 ? 'Pink' : 'Red';
+    if (L >= 55) return 'Pink';
+    return h >= 345 || h < 10 ? 'Purple' : 'Red';
+  }
+  if (h < 50) {                                   // somon / kiremit
+    if (C >= 40) return L >= 65 ? (h < 40 ? 'Pink' : 'Orange') : 'Red';
+    if (L >= 55) return 'Pink';
+    return C >= 25 ? 'Red' : 'Brown';
+  }
+  if (h < 75) {                                   // turuncu / şeftali / kahve
+    if (L < 45) return 'Brown';
+    if (L >= 72 && C < 18) return 'Beige';
+    if (L < 55 && C < 45) return 'Brown';
+    return 'Orange';
+  }
+  if (h < 105) {                                  // sarı / krem / zeytin
+    if (L < 50) return h > 95 ? 'Green' : 'Brown';
+    if (C < 25) return L >= 60 ? 'Beige' : C < 15 ? 'Gray' : 'Brown';
+    if (h >= 95 && L < 65) return 'Green';
+    return 'Yellow';
+  }
+  if (h < TEAL_CUT) return 'Green';
+  if (h < 295) return 'Blue';
+  if (h < 320) return 'Purple';
+  return C >= 45 ? 'Pink' : 'Purple';              // magenta pembe, soluk mor mor
+}
 
+/**
+ * Renk ailelerini sıralar. Renkli pikseller doygunluklarıyla, renksizler sabit
+ * düşük oyla sayılır: pastel bir resimde geniş krem gökyüzü, resmi tanımlayan
+ * pembe/yeşil tonların önüne geçmesin. `share` görseldeki alan payıdır.
+ */
 export function rankArtworkColors(pixels) {
-  const counts = new Map();
+  const votes = new Map();
+  const areas = new Map();
   const classified = new Map();
   let visible = 0;
   for (let i = 0; i < pixels.length; i += 4) {
     const alpha = pixels[i + 3] / 255;
     if (!alpha) continue;
-    const [r, g, b] = [pixels[i], pixels[i + 1], pixels[i + 2]];
-    const key = (r << 16) | (g << 8) | b;
-    let name = classified.get(key);
-    if (!name) {
-      const lab = toLab(r, g, b);
-      let nearest = Infinity;
-      for (const swatch of palette) {
-        const distance = swatch.lab.reduce((sum, v, j) => sum + (v - lab[j]) ** 2, 0);
-        if (distance < nearest) {
-          nearest = distance;
-          name = swatch.name;
-        }
-      }
-      classified.set(key, name);
+    const key = (pixels[i] << 16) | (pixels[i + 1] << 8) | pixels[i + 2];
+    let entry = classified.get(key);
+    if (!entry) {
+      const [L, C, h] = toLch(pixels[i], pixels[i + 1], pixels[i + 2]);
+      const name = colorFamily(L, C, h);
+      entry = { name, weight: NEUTRALS.has(name) ? NEUTRAL_WEIGHT : Math.min(C, CHROMA_CAP) / CHROMA_CAP };
+      classified.set(key, entry);
     }
-    counts.set(name, (counts.get(name) || 0) + alpha);
+    votes.set(entry.name, (votes.get(entry.name) || 0) + alpha * entry.weight);
+    areas.set(entry.name, (areas.get(entry.name) || 0) + alpha);
     visible += alpha;
   }
-  return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .map(([name, count]) => ({ name, share: count / visible }));
+  return [...votes].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([name]) => ({ name, share: areas.get(name) / visible }));
 }
 
 export async function detectArtworkColors(imagePath) {
